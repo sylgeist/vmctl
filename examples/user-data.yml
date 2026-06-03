@@ -1,0 +1,20 @@
+#cloud-config
+# Minimal NoCloud user-data. vmctl copies this file VERBATIM into the seed ISO
+# (it only generates the companion meta-data: instance-id + local-hostname).
+# Pass it with:  vmctl create web1 --config pod-cloudinit.conf \
+#                  --network labs_vlan50 --cloud-init examples/user-data.yml
+
+users:
+  - name: admin
+    groups: wheel
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/sh
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAReplaceWithYourPublicKey you@example.com
+
+packages:
+  - nginx
+
+runcmd:
+  - sysrc nginx_enable=YES
+  - service nginx start

@@ -51,6 +51,16 @@ bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 pod34
 and supervises it: when the guest reboots, bhyve exits and vmctl relaunches it;
 when it powers off, vmctl runs `bhyvectl --destroy` and stops.
 
+A complete, self-consistent example set lives in [`examples/`](examples/):
+
+- [`inventory.yml`](examples/inventory.yml) — annotated inventory (a two-disk
+  autostart VM and a cloud-init VM)
+- [`pod.conf`](examples/pod.conf) — shared bhyve_config template (root + zfs
+  nvme disks, netgraph)
+- [`pod-cloudinit.conf`](examples/pod-cloudinit.conf) — template with an AHCI-CD
+  device for the cloud-init seed ISO
+- [`user-data.yml`](examples/user-data.yml) — minimal NoCloud user-data
+
 ## Usage
 
 ```
