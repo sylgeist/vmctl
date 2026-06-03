@@ -1,6 +1,8 @@
+# frozen_string_literal: true
 # test/test_executor.rb
 require 'test_helper'
 require 'vmctl/executor'
+require 'tmpdir'
 
 class TestExecutor < Minitest::Test
   def test_capture_returns_stdout

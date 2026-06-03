@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 # lib/vmctl/executor.rb
 require 'open3'
-require 'tmpdir'
 require_relative 'log'
 
 module VMCtl
@@ -25,6 +24,7 @@ module VMCtl
     # Read-only query. Always executes. Raises on failure.
     def capture(cmd)
       VMCtl.logger.debug("exec: #{cmd}")
+      # Intentional: commands are pre-built strings; callers own injection safety.
       stdout, stderr, status = Open3.capture3(cmd)
       unless status.success?
         raise ExecutorError,

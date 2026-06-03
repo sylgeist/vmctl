@@ -8,4 +8,4 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
-      - run: ruby test/run_all.rb
+      - run: ruby -Ilib -Itest test/run_all.rb
