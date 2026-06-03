@@ -61,6 +61,9 @@ vmctl [options] <command> [args]
   restart <name>       Graceful stop then start.
   status [name]        Running/stopped, pid, network, link.
   console <name>       Attach to the VM's nmdm console (cu); ~. to detach.
+  create <name>        Allocate + provision a new VM (--network NET).
+  import <name>        Adopt an existing (zfs-recv'd) VM's disks (--network NET).
+  destroy <name>       Remove a VM (--purge also zfs-destroys its dataset).
   list                 List configured VMs.
 
   -c, --config FILE    Inventory file (default /usr/local/etc/vmctl/inventory.yml)
@@ -80,6 +83,27 @@ sysrc vmctl_enable=YES
 
 At boot it runs `vmctl start --all`, starting only VMs with `autostart: true`.
 
+## Provisioning
+
+`create` lays down a per-VM ZFS dataset and raw image file(s), and (with
+`--cloud-init FILE`) a NoCloud seed ISO. Defaults come from the `defaults:`
+block (`image_dir`, `root_size`, `root_from`):
+
+    vmctl create pod35 --network labs_vlan50                      # single root disk from the default golden image
+    vmctl create db1   --network labs_vlan50 --disk data:200G     # add a blank data disk
+    vmctl create web1  --network labs_vlan50 --cloud-init ./web-userdata.yml --start
+
+Templates stay opaque: vmctl creates exactly the disks in the VM's `disks:`
+list — your `.conf` template is responsible for referencing those paths (and,
+for cloud-init, declaring the AHCI-CD device that points at `<name>-seed.iso`).
+
+`import <name> --network NET` adopts a VM whose dataset already exists (e.g.
+arrived via `zfs recv`): it allocates a fresh `link`, scans `<vm_root>/<name>/`
+for `*.raw`, and registers the VM without provisioning.
+
+`destroy <name>` removes a VM from the inventory (refusing if it is running);
+`--purge` also `zfs destroy`s the dataset. All three honor `-n/--dry-run`.
+
 ## Tests
 
 ```sh
@@ -88,7 +112,6 @@ ruby -Ilib -Itest test/run_all.rb
 
 ## Scope
 
-vmctl manages VM **lifecycle** and **inventory**. It validates (never creates)
-netgraph bridges — those are host infrastructure owned by your `netgraph_setup`
-rc script. Provisioning (`create`, `import`, `destroy`, cloud-init) is a planned
-Phase 2.
+vmctl manages VM **lifecycle**, **inventory**, and **provisioning**. It validates
+(never creates) netgraph bridges — those are host infrastructure owned by your
+`netgraph_setup` rc script.

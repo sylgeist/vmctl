@@ -38,4 +38,16 @@ class TestExecutor < Minitest::Test
     assert_equal true, e.success?("true")
     assert_equal false, e.success?("false")
   end
+
+  def test_success_returns_false_for_missing_binary
+    e = VMCtl::Executor.new
+    # A no-metacharacter command is exec'd directly; a missing binary must not raise.
+    assert_equal false, e.success?("vmctl_definitely_missing_binary_xyz arg")
+  end
+
+  def test_capture_wraps_missing_binary_as_executor_error
+    e = VMCtl::Executor.new
+    err = assert_raises(VMCtl::ExecutorError) { e.capture("vmctl_definitely_missing_binary_xyz") }
+    assert_match(/command not found/, err.message)
+  end
 end

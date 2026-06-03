@@ -35,6 +35,10 @@ module VMCtl
               "#{cmd.split.first} exited with status #{status.exitstatus}: #{stderr.strip}"
       end
       stdout
+    rescue Errno::ENOENT
+      # A no-metacharacter command string is exec'd directly (no shell), so a
+      # missing binary surfaces as ENOENT — report it as an ExecutorError.
+      raise ExecutorError, "command not found: #{cmd.split.first}"
     end
 
     # Probe: true/false by exit status, never raises.
@@ -42,6 +46,9 @@ module VMCtl
       VMCtl.logger.debug("probe: #{cmd}")
       _out, _err, status = Open3.capture3(cmd)
       status.success?
+    rescue SystemCallError
+      # Missing binary / unrunnable command counts as "not successful".
+      false
     end
   end
 end

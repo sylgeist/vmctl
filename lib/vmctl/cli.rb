@@ -13,6 +13,9 @@ require_relative 'commands/start'
 require_relative 'commands/stop'
 require_relative 'commands/restart'
 require_relative 'commands/console'
+require_relative 'commands/create'
+require_relative 'commands/import'
+require_relative 'commands/destroy'
 
 module VMCtl
   module CLI
@@ -27,6 +30,9 @@ module VMCtl
         restart <name>        Graceful stop then start.
         status [name]         Running/stopped, pid, link, network.
         console <name>        Attach to the VM's nmdm console.
+        create <name>         Allocate + provision a new VM (--network NET).
+        import <name>         Adopt an existing (zfs-recv'd) VM's disks.
+        destroy <name>        Remove a VM (--purge also destroys its dataset).
         list                  List configured VMs.
         help                  Show this message.
 
@@ -43,7 +49,10 @@ module VMCtl
       'start'   => Commands::Start,
       'stop'    => Commands::Stop,
       'restart' => Commands::Restart,
-      'console' => Commands::Console
+      'console' => Commands::Console,
+      'create'  => Commands::Create,
+      'import'  => Commands::Import,
+      'destroy' => Commands::Destroy
     }.freeze
 
     def self.run(argv)
