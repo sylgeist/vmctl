@@ -58,6 +58,22 @@ class TestImportCommand < Minitest::Test
     assert_raises(VMCtl::Commands::CommandError) { cmd.call(['existing', '--network', 'labs_vlan50']) }
   end
 
+  def test_import_config_override
+    make_disks('pod40', ['pod40-root.raw', 1024])
+    cmd = VMCtl::Commands::Import.new(config: load_config, executor: FakeExecutor.new)
+    capture_stdout { cmd.call(['pod40', '--network', 'labs_vlan50', '--config', 'db.conf']) }
+    assert_equal 'db.conf', VMCtl::Config.load(@inv).vms.fetch('pod40').config
+  end
+
+  def test_import_dry_run_writes_nothing
+    make_disks('pod40', ['pod40-root.raw', 1024])
+    exec = FakeExecutor.new(dry_run: true)
+    before = File.read(@inv)
+    cmd = VMCtl::Commands::Import.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod40', '--network', 'labs_vlan50']) }
+    assert_equal before, File.read(@inv), 'dry-run must not change the inventory file'
+  end
+
   def test_import_fails_when_dataset_dir_missing
     cmd = VMCtl::Commands::Import.new(config: load_config, executor: FakeExecutor.new)
     err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['ghost', '--network', 'labs_vlan50']) }
