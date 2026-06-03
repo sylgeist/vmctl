@@ -113,4 +113,28 @@ class TestCreateCommand < Minitest::Test
     capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50']) }
     assert_equal before, File.read(@inv), 'dry-run must not change the inventory file'
   end
+
+  def test_create_rejects_malformed_disk
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--disk', 'zfs'])
+    end
+    assert_match(/--disk/, err.message)
+  end
+
+  def test_create_rejects_empty_disk_suffix
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--disk', ':5M'])
+    end
+  end
+
+  def test_create_rejects_disk_smaller_than_image
+    # base.raw is 1024 bytes; requesting 1 byte from it must be rejected.
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--disk', 'data:1:from base.raw'])
+    end
+    assert_match(/smaller/, err.message)
+  end
 end

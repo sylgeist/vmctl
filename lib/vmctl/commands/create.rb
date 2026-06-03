@@ -56,6 +56,7 @@ module VMCtl
 
       def build_entry(name, opts)
         d = config.defaults
+        allocator = Allocator.new(config)
         disks = [Disk.new(
           file: "#{name}-root.raw",
           size: opts[:root_size] || d.root_size,
@@ -66,24 +67,28 @@ module VMCtl
           name: name,
           config: opts[:config] || d.template,
           network: opts[:network],
-          link: Allocator.new(config).next_link,
-          mac: resolve_mac(name, opts[:mac]),
+          link: allocator.next_link,
+          mac: resolve_mac(allocator, name, opts[:mac]),
           autostart: !!opts[:autostart],
           disks: disks,
           cloud_init: nil
         )
       end
 
+      # --disk grammar: "<suffix>:<size>[:from <image>]"
+      #   e.g. "zfs:100G" or "data:50G:from gold.raw"
       def parse_disk(name, spec)
         body, from = spec.split(':from ', 2)
         suffix, size = body.split(':', 2)
-        raise CommandError, "invalid --disk #{spec.inspect}" unless suffix && size
+        if suffix.to_s.empty? || size.to_s.empty?
+          raise CommandError, "invalid --disk #{spec.inspect} (expected suffix:size)"
+        end
         Disk.new(file: "#{name}-#{suffix}.raw", size: size, from: from)
       end
 
-      def resolve_mac(name, mac)
+      def resolve_mac(allocator, name, mac)
         return nil if mac.nil?
-        return Allocator.new(config).generate_mac(name) if mac == 'generate'
+        return allocator.generate_mac(name) if mac == 'generate'
         mac
       end
 
