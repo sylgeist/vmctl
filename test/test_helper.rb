@@ -13,11 +13,16 @@ class FakeExecutor
 
   # captures: Hash of command-substring => stdout to return from #capture/#run
   # probes:   Hash of command-substring => boolean to return from #success?
-  def initialize(captures: {}, probes: {})
+  def initialize(captures: {}, probes: {}, dry_run: false)
     @runs = []
     @captures = []
     @canned = captures
     @probes = probes
+    @dry_run = dry_run
+  end
+
+  def dry_run?
+    @dry_run
   end
 
   def run(cmd)

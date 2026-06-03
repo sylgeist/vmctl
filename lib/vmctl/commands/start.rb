@@ -23,6 +23,10 @@ module VMCtl
       private
 
       def start_one(vm)
+        if executor.dry_run?
+          puts "[dry-run] #{vm.bhyve_command}"
+          return
+        end
         raise CommandError, "#{vm.name} already running" if vm.running?(executor)
         @netgraph.ensure_bridge!(vm.entry.network)
         sup = @factory.call(vm)

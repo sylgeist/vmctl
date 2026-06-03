@@ -12,6 +12,10 @@ module VMCtl
       @dry_run = dry_run
     end
 
+    def dry_run?
+      @dry_run
+    end
+
     # Mutating command. No-op (logs only) in dry-run.
     def run(cmd)
       if @dry_run

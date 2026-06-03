@@ -28,6 +28,11 @@ module VMCtl
           return
         end
 
+        if executor.dry_run?
+          puts "[dry-run] would #{force ? 'force-stop' : 'stop'} #{vm.name} (pid #{pid})"
+          return
+        end
+
         if force
           safe_kill('KILL', pid)
           executor.run("bhyvectl --destroy --vm=#{vm.name}")

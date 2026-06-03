@@ -9,6 +9,7 @@ require 'vmctl/commands/status'
 require 'vmctl/commands/start'
 require 'vmctl/commands/stop'
 require 'vmctl/commands/console'
+require 'vmctl/commands/restart'
 require 'tempfile'
 
 module CmdTestSupport
@@ -136,6 +137,18 @@ class TestStartCommand < Minitest::Test
     capture_stdout { cmd.call(['--all']) }
     assert_equal ['pod34'], started, "only autostart VMs start with --all"
   end
+
+  def test_start_dry_run_prints_command_and_does_not_start
+    exec = FakeExecutor.new(dry_run: true)
+    started = []
+    factory = ->(vm, **) { started << vm.name; FakeSupervisor.new }
+    cmd = VMCtl::Commands::Start.new(config: load_config, executor: exec,
+                                     supervisor_factory: factory)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_empty started, "dry-run must not start a supervisor"
+    assert_match(/\[dry-run\]/, out)
+    assert_match(%r{bhyve -k /bhyve/configs/pod\.conf}, out)
+  end
 end
 
 class TestStopCommand < Minitest::Test
@@ -160,5 +173,23 @@ class TestStopCommand < Minitest::Test
     exec = FakeExecutor.new
     cmd = VMCtl::Commands::Stop.new(config: load_config, executor: exec)
     assert_raises(OptionParser::ParseError) { cmd.call(['--bogus', 'pod34']) }
+  end
+end
+
+class TestRestartCommand < Minitest::Test
+  include CmdTestSupport
+
+  def test_restart_requires_a_name
+    cmd = VMCtl::Commands::Restart.new(config: load_config, executor: FakeExecutor.new)
+    assert_raises(VMCtl::Commands::CommandError) { cmd.call([]) }
+  end
+
+  def test_restart_dry_run_stops_then_prints_start
+    # dry-run executor makes both Stop and Start short-circuit (no signals/fork).
+    exec = FakeExecutor.new(dry_run: true)
+    cmd = VMCtl::Commands::Restart.new(config: load_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/pod34/, out)
+    assert_match(%r{bhyve -k /bhyve/configs/pod\.conf}, out, "start invocation printed after stop")
   end
 end
