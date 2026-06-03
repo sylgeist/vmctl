@@ -2,6 +2,7 @@
 # test/test_cli.rb
 require 'test_helper'
 require 'stringio'
+require 'tempfile'
 require 'vmctl/cli'
 
 class TestCLI < Minitest::Test
@@ -48,6 +49,21 @@ class TestCLI < Minitest::Test
       $stderr = StringIO.new
       begin
         VMCtl::CLI.run([])
+      ensure
+        $stderr = STDERR
+      end
+    end
+    assert_equal 2, code
+  end
+
+  def test_subcommand_bad_flag_exits_two
+    inv = Tempfile.new(['inv', '.yml'])
+    inv.write("vms: {}\n")
+    inv.flush
+    code, _ = capture_exit do
+      $stderr = StringIO.new
+      begin
+        VMCtl::CLI.run(['-c', inv.path, 'stop', '--bogus'])
       ensure
         $stderr = STDERR
       end

@@ -86,6 +86,9 @@ module VMCtl
         config = Config.load(options[:config])
         executor = Executor.new(dry_run: options[:dry_run])
         klass.new(config: config, executor: executor).call(argv)
+      rescue OptionParser::ParseError => e
+        warn e.message
+        exit 2
       rescue ConfigError, Commands::CommandError,
              NetgraphError, ExecutorError => e
         warn "error: #{e.message}"

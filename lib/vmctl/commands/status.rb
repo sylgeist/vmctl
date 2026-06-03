@@ -9,21 +9,11 @@ module VMCtl
         all = args.delete('--all')
         vms = targets(args, all: all || args.empty?)
         vms.each do |vm|
-          running = executor.success?("test -e #{vm.vmm_device}")
-          state = running ? 'running' : 'stopped'
-          pid = read_pid(vm)
+          state = vm.running?(executor) ? 'running' : 'stopped'
+          pid = vm.read_pid
           pid_str = pid ? " pid #{pid}" : ''
           puts "#{vm.name}: #{state}#{pid_str} (#{vm.entry.network} link #{vm.entry.link})"
         end
-      end
-
-      private
-
-      def read_pid(vm)
-        return nil unless File.exist?(vm.pidfile)
-        File.read(vm.pidfile).strip
-      rescue StandardError
-        nil
       end
     end
   end

@@ -7,6 +7,7 @@ require 'vmctl/executor'
 require 'vmctl/commands/list'
 require 'vmctl/commands/status'
 require 'vmctl/commands/start'
+require 'vmctl/commands/stop'
 require 'vmctl/commands/console'
 require 'tempfile'
 
@@ -134,5 +135,30 @@ class TestStartCommand < Minitest::Test
                                      supervisor_factory: factory)
     capture_stdout { cmd.call(['--all']) }
     assert_equal ['pod34'], started, "only autostart VMs start with --all"
+  end
+end
+
+class TestStopCommand < Minitest::Test
+  include CmdTestSupport
+
+  def test_stop_no_pidfile_prints_not_running
+    exec = FakeExecutor.new
+    cmd = VMCtl::Commands::Stop.new(config: load_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/not running/, out)
+    assert_empty exec.runs, "no destroy without --force"
+  end
+
+  def test_stop_force_no_pidfile_runs_destroy
+    exec = FakeExecutor.new
+    cmd = VMCtl::Commands::Stop.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['--force', 'pod34']) }
+    assert_includes exec.runs, 'bhyvectl --destroy --vm=pod34'
+  end
+
+  def test_stop_rejects_unknown_flag
+    exec = FakeExecutor.new
+    cmd = VMCtl::Commands::Stop.new(config: load_config, executor: exec)
+    assert_raises(OptionParser::ParseError) { cmd.call(['--bogus', 'pod34']) }
   end
 end

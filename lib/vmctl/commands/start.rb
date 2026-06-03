@@ -23,15 +23,11 @@ module VMCtl
       private
 
       def start_one(vm)
-        raise CommandError, "#{vm.name} already running" if running?(vm)
+        raise CommandError, "#{vm.name} already running" if vm.running?(executor)
         @netgraph.ensure_bridge!(vm.entry.network)
         sup = @factory.call(vm)
         pid = sup.start
         puts "started #{vm.name} (supervisor pid #{pid})"
-      end
-
-      def running?(vm)
-        executor.success?("test -e #{vm.vmm_device}")
       end
     end
   end

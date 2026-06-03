@@ -21,7 +21,7 @@ module VMCtl
       private
 
       def stop_one(vm, force:)
-        pid = read_pid(vm)
+        pid = vm.read_pid
         unless pid
           puts "#{vm.name} not running (no pidfile)"
           executor.run("bhyvectl --destroy --vm=#{vm.name}") if force
@@ -36,13 +36,6 @@ module VMCtl
           safe_kill('TERM', pid)
           puts "stopping #{vm.name} (graceful poweroff requested)"
         end
-      end
-
-      def read_pid(vm)
-        return nil unless File.exist?(vm.pidfile)
-        Integer(File.read(vm.pidfile).strip)
-      rescue StandardError
-        nil
       end
 
       def safe_kill(sig, pid)

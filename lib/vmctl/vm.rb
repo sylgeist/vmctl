@@ -55,5 +55,16 @@ module VMCtl
     def disk_paths
       @entry.disks.map { |d| File.join(dir, d.file) }
     end
+
+    def running?(executor)
+      executor.success?("test -e #{vmm_device}")
+    end
+
+    def read_pid
+      return nil unless File.exist?(pidfile)
+      Integer(File.read(pidfile).strip)
+    rescue StandardError
+      nil
+    end
   end
 end
