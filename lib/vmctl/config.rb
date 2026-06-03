@@ -76,7 +76,7 @@ module VMCtl
         vm_root:    merged['vm_root'],
         zpool:      merged['zpool'],
         template:   merged['template'],
-        link_base:  Integer(merged['link_base']),
+        link_base:  parse_link_base(merged['link_base']),
         run_dir:    merged['run_dir'],
         log_dir:    merged['log_dir']
       )
@@ -103,9 +103,16 @@ module VMCtl
       )
     end
 
+    def parse_link_base(value)
+      Integer(value)
+    rescue ArgumentError, TypeError
+      raise ConfigError, "'link_base' must be an integer, got: #{value.inspect}"
+    end
+
     def parse_disks(list)
       raise ConfigError, "'disks' must be a list" unless list.is_a?(Array)
       list.map do |d|
+        raise ConfigError, "each disk must be a mapping, got: #{d.inspect}" unless d.is_a?(Hash)
         Disk.new(file: d['file'], size: d['size'], from: d['from'])
       end
     end

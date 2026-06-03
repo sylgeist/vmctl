@@ -91,4 +91,34 @@ class TestConfig < Minitest::Test
     assert_empty leftovers, "atomic save must not leave temp files: #{leftovers}"
     f.close
   end
+
+  def test_raises_on_non_hash_top_level
+    f = write_inventory("- just\n- a\n- list\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_raises_on_non_mapping_vms
+    f = write_inventory("vms:\n  - a\n  - b\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_raises_on_non_mapping_vm_body
+    f = write_inventory("vms:\n  pod1: just-a-string\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_raises_on_non_integer_link_base
+    f = write_inventory("defaults:\n  link_base: not-a-number\nvms: {}\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_raises_on_non_mapping_disk_entry
+    f = write_inventory("vms:\n  pod1:\n    network: n\n    link: 10\n    disks:\n      - just-a-string\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
 end
