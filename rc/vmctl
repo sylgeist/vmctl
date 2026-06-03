@@ -1,0 +1,28 @@
+#!/bin/sh
+# PROVIDE: vmctl
+# REQUIRE: netgraph_setup
+# KEYWORD: nojail
+#
+# Install: cp rc/vmctl /usr/local/etc/rc.d/vmctl && chmod +x it
+# Enable:  sysrc vmctl_enable=YES
+
+. /etc/rc.subr
+
+name="vmctl"
+rcvar="vmctl_enable"
+start_cmd="vmctl_start"
+stop_cmd="vmctl_stop"
+: ${vmctl_bin:="/usr/local/bin/vmctl"}
+
+vmctl_start()
+{
+    ${vmctl_bin} start --all
+}
+
+vmctl_stop()
+{
+    ${vmctl_bin} stop --all
+}
+
+load_rc_config $name
+run_rc_command "$1"
