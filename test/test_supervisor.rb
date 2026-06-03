@@ -24,6 +24,7 @@ class TestSupervisor < Minitest::Test
     refute VMCtl::Supervisor.reboot?(1)
     refute VMCtl::Supervisor.reboot?(2)
     refute VMCtl::Supervisor.reboot?(3)
+    refute VMCtl::Supervisor.reboot?(4)
   end
 
   def test_loop_relaunches_on_reboot_then_stops_on_poweroff
@@ -44,5 +45,20 @@ class TestSupervisor < Minitest::Test
     sup = VMCtl::Supervisor.new(build_vm, executor: exec, runner: runner)
     sup.supervise
     assert_equal 1, exec.runs.count { |c| c.include?('bhyvectl --destroy --vm=pod34') }
+  end
+
+  def test_loop_stops_when_poweroff_requested_during_run
+    exec = FakeExecutor.new
+    sup = nil
+    calls = 0
+    runner = lambda do
+      calls += 1
+      sup.request_poweroff # simulate a TERM arriving during the run
+      0                    # guest reports reboot, but a stop was requested
+    end
+    sup = VMCtl::Supervisor.new(build_vm, executor: exec, runner: runner)
+    sup.supervise
+    assert_equal 1, calls, "must not relaunch after poweroff requested"
+    assert_equal 1, exec.runs.count { |c| c.include?('bhyvectl --destroy') }
   end
 end

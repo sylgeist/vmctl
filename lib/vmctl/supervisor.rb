@@ -25,11 +25,18 @@ module VMCtl
     # The core loop. Testable with an injected runner + FakeExecutor.
     def supervise
       loop do
+        break if @poweroff_requested # a stop requested between runs must not relaunch
         status = @runner.call
         @exec.run("bhyvectl --destroy --vm=#{@vm.name}")
         break if @poweroff_requested
         break unless self.class.reboot?(status)
       end
+    end
+
+    # Request a graceful stop: the loop will not relaunch after the current run.
+    # Called from the TERM handler (and from tests to simulate a stop signal).
+    def request_poweroff
+      @poweroff_requested = true
     end
 
     # Fork a detached supervisor, write the pidfile, redirect output.
@@ -61,10 +68,10 @@ module VMCtl
       status.exitstatus || 1
     end
 
-    # On TERM: ask the guest to power off via ACPI, and don't relaunch.
+    # On TERM: stop after the current run, and force-poweroff the live guest.
     def install_signal_handlers
       Signal.trap('TERM') do
-        @poweroff_requested = true
+        request_poweroff
         @exec.run("bhyvectl --force-poweroff --vm=#{@vm.name}") if @bhyve_pid
       end
     end
