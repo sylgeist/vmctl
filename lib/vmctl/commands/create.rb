@@ -97,10 +97,15 @@ module VMCtl
         raise CommandError, "template not found: #{vm.template_path}" unless File.exist?(vm.template_path)
         raise CommandError, "dataset dir already exists: #{vm.dir}" if File.exist?(vm.dir)
         entry.disks.each do |disk|
+          begin
+            requested = Sizes.parse(disk.size)
+          rescue ArgumentError
+            raise CommandError, "disk #{disk.file} has invalid size #{disk.size.inspect}"
+          end
           next unless disk.from
           image = provisioner.image_path(disk.from)
           raise CommandError, "image not found: #{image}" unless File.exist?(image)
-          if Sizes.parse(disk.size) < File.size(image)
+          if requested < File.size(image)
             raise CommandError, "disk #{disk.file} size #{disk.size} is smaller than image #{disk.from}"
           end
         end

@@ -64,7 +64,7 @@ class TestCreateCommand < Minitest::Test
 
   def test_create_rejects_duplicate_name
     exec = bridge_ok
-    VMCtl::Commands::Create.new(config: load_config, executor: exec).call(['pod35', '--network', 'labs_vlan50'])
+    capture_stdout { VMCtl::Commands::Create.new(config: load_config, executor: exec).call(['pod35', '--network', 'labs_vlan50']) }
     err = assert_raises(VMCtl::Commands::CommandError) do
       VMCtl::Commands::Create.new(config: load_config, executor: exec).call(['pod35', '--network', 'labs_vlan50'])
     end
@@ -136,5 +136,20 @@ class TestCreateCommand < Minitest::Test
       cmd.call(['pod35', '--network', 'labs_vlan50', '--disk', 'data:1:from base.raw'])
     end
     assert_match(/smaller/, err.message)
+  end
+
+  def test_create_rejects_invalid_root_size
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--root-size', 'notasize'])
+    end
+    assert_match(/invalid size/, err.message)
+  end
+
+  def test_create_rejects_invalid_extra_disk_size
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--disk', 'data:bogus'])
+    end
   end
 end
