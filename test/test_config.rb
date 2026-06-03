@@ -121,4 +121,45 @@ class TestConfig < Minitest::Test
     assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
     f.close
   end
+
+  def test_new_provisioning_defaults_fill_in
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal '/bhyve/images', cfg.defaults.image_dir
+    assert_equal '20G', cfg.defaults.root_size
+    assert_nil cfg.defaults.root_from
+    f.close
+  end
+
+  def test_new_defaults_are_overridable_and_round_trip
+    yaml = "defaults:\n  image_dir: /tank/img\n  root_size: 40G\n  root_from: base.raw\nvms: {}\n"
+    f = write_inventory(yaml)
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal '/tank/img', cfg.defaults.image_dir
+    assert_equal '40G', cfg.defaults.root_size
+    assert_equal 'base.raw', cfg.defaults.root_from
+    out = File.join(Dir.mktmpdir, 'out.yml')
+    cfg.save(out)
+    reloaded = VMCtl::Config.load(out)
+    assert_equal '/tank/img', reloaded.defaults.image_dir
+    assert_equal '40G', reloaded.defaults.root_size
+    assert_equal 'base.raw', reloaded.defaults.root_from
+    f.close
+  end
+
+  def test_add_and_remove_vm
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    entry = VMCtl::VMEntry.new(
+      name: 'pod99', config: 'pod.conf', network: 'labs_vlan50', link: 10,
+      mac: nil, autostart: false,
+      disks: [VMCtl::Disk.new(file: 'pod99-root.raw', size: '20G', from: nil)],
+      cloud_init: nil
+    )
+    cfg.add_vm(entry)
+    assert cfg.vms.key?('pod99')
+    cfg.remove_vm('pod99')
+    refute cfg.vms.key?('pod99')
+    f.close
+  end
 end

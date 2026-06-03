@@ -8,6 +8,7 @@ module VMCtl
 
   Defaults = Struct.new(
     :config_dir, :vm_root, :zpool, :template, :link_base, :run_dir, :log_dir,
+    :image_dir, :root_size, :root_from,
     keyword_init: true
   )
   VMEntry = Struct.new(
@@ -24,7 +25,10 @@ module VMCtl
       'template'   => 'pod.conf',
       'link_base'  => 10,
       'run_dir'    => '/var/run/vmctl',
-      'log_dir'    => '/var/log/vmctl'
+      'log_dir'    => '/var/log/vmctl',
+      'image_dir'  => '/bhyve/images',
+      'root_size'  => '20G',
+      'root_from'  => nil
     }.freeze
 
     attr_reader :defaults, :vms, :path
@@ -56,6 +60,14 @@ module VMCtl
       end
     end
 
+    def add_vm(entry)
+      @vms[entry.name] = entry
+    end
+
+    def remove_vm(name)
+      @vms.delete(name)
+    end
+
     def to_h
       {
         'defaults' => @defaults.to_h.transform_keys(&:to_s),
@@ -78,7 +90,10 @@ module VMCtl
         template:   merged['template'],
         link_base:  parse_link_base(merged['link_base']),
         run_dir:    merged['run_dir'],
-        log_dir:    merged['log_dir']
+        log_dir:    merged['log_dir'],
+        image_dir:  merged['image_dir'],
+        root_size:  merged['root_size'],
+        root_from:  merged['root_from']
       )
     end
 
