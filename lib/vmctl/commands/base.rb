@@ -1,0 +1,38 @@
+# frozen_string_literal: true
+# lib/vmctl/commands/base.rb
+require_relative '../vm'
+
+module VMCtl
+  module Commands
+    class CommandError < StandardError; end
+
+    class Base
+      def initialize(config:, executor:)
+        @config = config
+        @executor = executor
+      end
+
+      protected
+
+      attr_reader :config, :executor
+
+      def vm_for(name)
+        entry = config.vms[name]
+        raise CommandError, "unknown VM '#{name}'" unless entry
+        VM.new(entry, config.defaults)
+      end
+
+      # Resolve a target list from args: explicit names, or all VMs (--all),
+      # optionally restricted to autostart VMs.
+      def targets(names, all:, autostart_only: false)
+        if all
+          entries = config.vms.values
+          entries = entries.select(&:autostart) if autostart_only
+          entries.map { |e| VM.new(e, config.defaults) }
+        else
+          names.map { |n| vm_for(n) }
+        end
+      end
+    end
+  end
+end
