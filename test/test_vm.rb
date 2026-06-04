@@ -53,4 +53,22 @@ class TestVM < Minitest::Test
     assert_equal '/dev/nmdm10B', vm.console_device
     assert_equal ['/bhyve/pod34/pod34-root.raw'], vm.disk_paths
   end
+
+  def test_dump_command_inserts_config_dump_before_name
+    vm = VMCtl::VM.new(entry, defaults)
+    assert_equal(
+      'bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 ' \
+      '-o config.dump=1 pod34',
+      vm.dump_command
+    )
+  end
+
+  def test_dump_command_with_mac_keeps_order
+    vm = VMCtl::VM.new(entry(mac: '5a:9c:fc:01:02:03'), defaults)
+    assert_equal(
+      'bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 ' \
+      '-o mac=5a:9c:fc:01:02:03 -o config.dump=1 pod34',
+      vm.dump_command
+    )
+  end
 end

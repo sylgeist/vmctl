@@ -28,6 +28,14 @@ module VMCtl
       bhyve_argv.join(' ')
     end
 
+    # Like bhyve_command, but appends `-o config.dump=1` so bhyve prints the
+    # fully-resolved config and exits without booting.
+    def dump_command
+      argv = bhyve_argv
+      argv.insert(-2, '-o', 'config.dump=1')
+      argv.join(' ')
+    end
+
     def template_path
       File.join(@defaults.config_dir, @entry.config)
     end
