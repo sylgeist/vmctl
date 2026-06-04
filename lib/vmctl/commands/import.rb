@@ -24,7 +24,7 @@ module VMCtl
           name: name,
           config: opts[:config] || config.defaults.template,
           network: opts[:network],
-          link: Allocator.new(config).next_link,
+          link: resolve_link(opts),
           mac: opts[:mac],
           autostart: false,
           disks: raws.map { |p| Disk.new(file: File.basename(p), size: Sizes.human(File.size(p)), from: nil) },
@@ -43,10 +43,22 @@ module VMCtl
           p.on('--network NET') { |v| o[:network] = v }
           p.on('--config TMPL') { |v| o[:config] = v }
           p.on('--mac MAC')     { |v| o[:mac] = v }
+          p.on('--link N', Integer) { |v| o[:link] = v }
         end
         rest = parser.parse(args)
         o[:name] = rest.shift
         o
+      end
+
+      # Pin the given link (any unused value, including below link_base) or
+      # auto-allocate the lowest free link when --link is omitted.
+      def resolve_link(opts)
+        allocator = Allocator.new(config)
+        return allocator.next_link unless opts[:link]
+        if allocator.link_taken?(opts[:link])
+          raise CommandError, "link #{opts[:link]} already in use"
+        end
+        opts[:link]
       end
     end
   end
