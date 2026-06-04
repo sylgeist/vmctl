@@ -85,4 +85,29 @@ class TestImportCommand < Minitest::Test
     cmd = VMCtl::Commands::Import.new(config: load_config, executor: FakeExecutor.new)
     assert_raises(VMCtl::Commands::CommandError) { cmd.call(['empty', '--network', 'labs_vlan50']) }
   end
+
+  def test_import_link_pins_below_base
+    make_disks('pod40', ['pod40-root.raw', 1024])
+    cmd = VMCtl::Commands::Import.new(config: load_config, executor: FakeExecutor.new)
+    capture_stdout { cmd.call(['pod40', '--network', 'labs_vlan50', '--link', '8']) }
+    assert_equal 8, VMCtl::Config.load(@inv).vms.fetch('pod40').link
+  end
+
+  def test_import_link_rejects_collision
+    make_disks('pod40', ['pod40-root.raw', 1024])
+    cmd = VMCtl::Commands::Import.new(config: load_config, executor: FakeExecutor.new)
+    # link 10 is already used by the `existing` VM in the fixture inventory.
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod40', '--network', 'labs_vlan50', '--link', '10'])
+    end
+    assert_match(/already in use/, err.message)
+  end
+
+  def test_import_rejects_non_integer_link
+    make_disks('pod40', ['pod40-root.raw', 1024])
+    cmd = VMCtl::Commands::Import.new(config: load_config, executor: FakeExecutor.new)
+    assert_raises(OptionParser::ParseError) do
+      cmd.call(['pod40', '--network', 'labs_vlan50', '--link', 'notanumber'])
+    end
+  end
 end

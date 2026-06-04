@@ -111,6 +111,17 @@ for cloud-init, declaring the AHCI-CD device that points at `<name>-seed.iso`).
 arrived via `zfs recv`): it allocates a fresh `link`, scans `<vm_root>/<name>/`
 for `*.raw`, and registers the VM without provisioning.
 
+To adopt a VM that's **already on this host** (started by hand or an old
+script), pin its current link so its console (`/dev/nmdm<link>`) and netgraph
+hook don't move:
+
+    vmctl import pod34 --network labs_vlan50 --link 8
+
+`--link` accepts any unused link (including the 0-9 band reserved from
+auto-allocation). Omit it to auto-allocate the lowest free link. After importing,
+stop the VM the old way once, then `vmctl start pod34` so vmctl's supervisor
+takes over.
+
 `destroy <name>` removes a VM from the inventory (refusing if it is running);
 `--purge` also `zfs destroy`s the dataset. All three honor `-n/--dry-run`.
 
