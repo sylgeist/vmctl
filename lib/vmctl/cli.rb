@@ -13,6 +13,7 @@ require_relative 'commands/start'
 require_relative 'commands/stop'
 require_relative 'commands/restart'
 require_relative 'commands/console'
+require_relative 'commands/dump'
 require_relative 'commands/create'
 require_relative 'commands/import'
 require_relative 'commands/destroy'
@@ -30,6 +31,7 @@ module VMCtl
         restart <name>        Graceful stop then start.
         status [name]         Running/stopped, pid, link, network.
         console <name>        Attach to the VM's nmdm console.
+        dump <name>           Print the VM's fully-resolved bhyve config (config.dump).
         create <name>         Allocate + provision a new VM (--network NET).
         import <name>         Adopt an existing (zfs-recv'd) VM's disks.
         destroy <name>        Remove a VM (--purge also destroys its dataset).
@@ -50,6 +52,7 @@ module VMCtl
       'stop'    => Commands::Stop,
       'restart' => Commands::Restart,
       'console' => Commands::Console,
+      'dump'    => Commands::Dump,
       'create'  => Commands::Create,
       'import'  => Commands::Import,
       'destroy' => Commands::Destroy
