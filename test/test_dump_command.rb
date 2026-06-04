@@ -35,13 +35,23 @@ class TestDumpCommand < Minitest::Test
     $stdout = STDOUT
   end
 
-  def test_dump_captures_and_prints_resolved_config
+  def test_dump_prints_config_despite_nonzero_exit
+    # bhyve config.dump exits non-zero by design; FakeExecutor#capture_unchecked
+    # models that. The captured stdout must still be printed.
     exec = FakeExecutor.new(captures: { 'config.dump=1' => "config.dump=1\ncpus=2\nmemory.size=4G\n" })
     cmd = VMCtl::Commands::Dump.new(config: load_config, executor: exec)
     out = capture_stdout { cmd.call(['pod34']) }
-    # The command passed to capture must include config.dump and the VM name.
     assert(exec.captures.any? { |c| c.include?('-o config.dump=1') && c.include?('pod34') })
     assert_match(/memory\.size=4G/, out)
+  end
+
+  def test_dump_raises_when_no_config_produced
+    # No stdout + an error on stderr => a genuine bhyve failure (e.g. bad template).
+    exec = FakeExecutor.new(errs: { 'config.dump=1' => 'bhyve: failed to parse config file' })
+    cmd = VMCtl::Commands::Dump.new(config: load_config, executor: exec)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
+    assert_match(/could not dump config/, err.message)
+    assert_match(/failed to parse/, err.message)
   end
 
   def test_dump_requires_a_name

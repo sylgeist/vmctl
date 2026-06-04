@@ -52,12 +52,23 @@ the configuration and exit before device setup, so the command:
     name = args.first
     raise CommandError, 'dump requires a VM name' unless name
     vm = vm_for(name)            # raises CommandError for an unknown VM
-    puts executor.capture(vm.dump_command)
+    out, err, = executor.capture_unchecked(vm.dump_command)
+    if out.strip.empty?
+      detail = err.strip.empty? ? '' : ": #{err.strip}"
+      raise CommandError, "could not dump config for #{vm.name}#{detail}"
+    end
+    print out
   end
   ```
-  Uses `executor.capture` (read-only; always executes, even under `-n`), so
-  `dump` behaves as a query like `status`, not a mutation. A non-zero bhyve exit
-  surfaces as a clean `ExecutorError` (rescued by the CLI → exit 1).
+  **Important:** `config.dump=1` makes bhyve print the resolved config to
+  **stdout** and **exit non-zero (status 1) by design**. So `dump` must NOT use
+  the raising `executor.capture` (which treats any non-zero exit as failure and
+  would discard the dump). Instead it uses `executor.capture_unchecked`
+  (read-only; always executes, even under `-n`), which returns
+  `[stdout, stderr, exitstatus]` without raising on a non-zero exit. Success is
+  detected by **stdout being non-empty** (config.dump always produces output);
+  an empty stdout means a genuine failure (e.g. bad template), surfaced as a
+  `CommandError` carrying stderr.
 - **CLI wiring** — add `require_relative 'commands/dump'`, register
   `'dump' => Commands::Dump` in `COMMANDS`, and add a usage line:
   `dump <name>            Print the VM's fully-resolved bhyve config (config.dump).`
@@ -66,7 +77,9 @@ the configuration and exit before device setup, so the command:
 
 - Missing name → `CommandError` ("dump requires a VM name") → CLI exit 1.
 - Unknown VM → `CommandError` (via `vm_for`) → CLI exit 1.
-- bhyve failure (e.g. bad template) → `ExecutorError` → CLI exit 1.
+- bhyve failure (e.g. bad template): no stdout produced → `CommandError`
+  ("could not dump config …", carrying stderr) → CLI exit 1.
+- Missing bhyve binary → `ExecutorError` ("command not found: bhyve") → exit 1.
 
 ## Testing
 
