@@ -11,13 +11,15 @@ VMCtl.log_level = Logger::FATAL
 class FakeExecutor
   attr_reader :runs, :captures
 
-  # captures: Hash of command-substring => stdout to return from #capture/#run
+  # captures: Hash of command-substring => stdout to return from #capture/#run/#capture_unchecked
   # probes:   Hash of command-substring => boolean to return from #success?
-  def initialize(captures: {}, probes: {}, dry_run: false)
+  # errs:     Hash of command-substring => stderr to return from #capture_unchecked
+  def initialize(captures: {}, probes: {}, errs: {}, dry_run: false)
     @runs = []
     @captures = []
     @canned = captures
     @probes = probes
+    @errs = errs
     @dry_run = dry_run
   end
 
@@ -40,10 +42,22 @@ class FakeExecutor
     match ? match[1] : true
   end
 
+  # Returns [stdout, stderr, exitstatus]; status is a non-zero stand-in to model
+  # commands (like bhyve config.dump) that exit non-zero by design.
+  def capture_unchecked(cmd)
+    @captures << cmd
+    [canned_for(cmd) || "", err_for(cmd) || "", 1]
+  end
+
   private
 
   def canned_for(cmd)
     match = @canned.find { |k, _| cmd.include?(k) }
+    match&.last
+  end
+
+  def err_for(cmd)
+    match = @errs.find { |k, _| cmd.include?(k) }
     match&.last
   end
 end
