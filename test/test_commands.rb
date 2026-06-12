@@ -11,6 +11,7 @@ require 'vmctl/commands/stop'
 require 'vmctl/commands/console'
 require 'vmctl/commands/restart'
 require 'tempfile'
+require 'tmpdir'
 
 module CmdTestSupport
   INVENTORY = <<~YAML
@@ -148,6 +149,55 @@ class TestStartCommand < Minitest::Test
     assert_empty started, "dry-run must not start a supervisor"
     assert_match(/\[dry-run\]/, out)
     assert_match(%r{bhyve -k /bhyve/configs/pod\.conf}, out)
+  end
+
+  def config_for_iso(template_body:, iso:)
+    dir = Dir.mktmpdir
+    File.write(File.join(dir, 'inst.conf'), template_body)
+    inv = <<~YAML
+      defaults:
+        config_dir: #{dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: /tmp/vmctl-test-run
+        log_dir: /tmp/vmctl-test-log
+      vms:
+        pod36:
+          config: inst.conf
+          network: labs_vlan50
+          link: 12
+          disks: [{ file: pod36-root.raw, size: 20G }]
+    YAML
+    inv += "    iso: #{iso}\n" if iso
+    f = Tempfile.new(['inv', '.yml'])
+    f.write(inv)
+    f.flush
+    VMCtl::Config.load(f.path)
+  end
+
+  def never_start_factory
+    ->(_vm, **) { flunk 'supervisor must not start when iso validation fails' }
+  end
+
+  def test_start_rejects_iso_when_template_lacks_reference
+    cfg = config_for_iso(template_body: "cpus=2\n", iso: '/bhyve/isos/x.iso')
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod36' => false,
+                                      'ngctl info labs_vlan50:' => true })
+    cmd = VMCtl::Commands::Start.new(config: cfg, executor: exec,
+                                     supervisor_factory: never_start_factory)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod36']) }
+    assert_match(/does not reference/, err.message)
+  end
+
+  def test_start_rejects_installer_template_without_iso
+    cfg = config_for_iso(template_body: "pci.0.5.0.port.0.path=%(iso)\n", iso: nil)
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod36' => false,
+                                      'ngctl info labs_vlan50:' => true })
+    cmd = VMCtl::Commands::Start.new(config: cfg, executor: exec,
+                                     supervisor_factory: never_start_factory)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod36']) }
+    assert_match(/references %\(iso\)/, err.message)
   end
 end
 

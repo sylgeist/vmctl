@@ -28,6 +28,7 @@ module VMCtl
           return
         end
         raise CommandError, "#{vm.name} already running" if vm.running?(executor)
+        validate_iso_pairing!(vm)
         @netgraph.ensure_bridge!(vm.entry.network)
         sup = @factory.call(vm)
         pid = sup.start
