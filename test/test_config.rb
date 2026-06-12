@@ -147,6 +147,24 @@ class TestConfig < Minitest::Test
     f.close
   end
 
+  def test_iso_round_trips
+    f = write_inventory(VALID_INVENTORY + "    iso: /bhyve/isos/freebsd-14.3.iso\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal '/bhyve/isos/freebsd-14.3.iso', cfg.vms['pod34'].iso
+    out = File.join(Dir.mktmpdir, 'out.yml')
+    cfg.save(out)
+    assert_equal '/bhyve/isos/freebsd-14.3.iso', VMCtl::Config.load(out).vms['pod34'].iso
+    f.close
+  end
+
+  def test_iso_omitted_from_yaml_when_nil
+    f = write_inventory(VALID_INVENTORY)
+    cfg = VMCtl::Config.load(f.path)
+    assert_nil cfg.vms['pod34'].iso
+    refute_match(/^\s*iso:/, cfg.to_yaml)
+    f.close
+  end
+
   def test_add_and_remove_vm
     f = write_inventory("vms: {}\n")
     cfg = VMCtl::Config.load(f.path)

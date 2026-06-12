@@ -12,7 +12,7 @@ module VMCtl
     keyword_init: true
   )
   VMEntry = Struct.new(
-    :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init,
+    :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
     keyword_init: true
   )
   Disk = Struct.new(:file, :size, :from, keyword_init: true)
@@ -114,7 +114,8 @@ module VMCtl
         mac:        body['mac'],
         autostart:  body.fetch('autostart', false),
         disks:      parse_disks(body.fetch('disks', [])),
-        cloud_init: body['cloud_init']
+        cloud_init: body['cloud_init'],
+        iso:        body['iso']
       )
     end
 
@@ -142,6 +143,7 @@ module VMCtl
         'disks'   => vm.disks.map { |d| compact_disk(d) }
       }
       h['cloud_init'] = vm.cloud_init if vm.cloud_init
+      h['iso'] = vm.iso if vm.iso
       h
     end
 
