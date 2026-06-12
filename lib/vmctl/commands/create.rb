@@ -46,6 +46,7 @@ module VMCtl
           p.on('--root-from IMG')  { |v| o[:root_from] = v }
           p.on('--disk SPEC')   { |v| o[:disks] << v }
           p.on('--cloud-init FILE') { |v| o[:cloud_init] = v }
+          p.on('--iso FILE')    { |v| o[:iso] = v }
           p.on('--autostart')   { o[:autostart] = true }
           p.on('--start')       { o[:start] = true }
         end
@@ -71,7 +72,8 @@ module VMCtl
           mac: resolve_mac(allocator, name, opts[:mac]),
           autostart: !!opts[:autostart],
           disks: disks,
-          cloud_init: nil
+          cloud_init: nil,
+          iso: opts[:iso] && File.expand_path(opts[:iso])
         )
       end
 
@@ -95,6 +97,10 @@ module VMCtl
       def validate!(vm, entry, opts, provisioner)
         Netgraph.new(executor).ensure_bridge!(entry.network)
         raise CommandError, "template not found: #{vm.template_path}" unless File.exist?(vm.template_path)
+        if entry.iso && !File.exist?(entry.iso)
+          raise CommandError, "iso not found: #{entry.iso}"
+        end
+        validate_iso_pairing!(vm)
         raise CommandError, "dataset dir already exists: #{vm.dir}" if File.exist?(vm.dir)
         entry.disks.each do |disk|
           begin

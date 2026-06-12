@@ -33,6 +33,19 @@ module VMCtl
           names.map { |n| vm_for(n) }
         end
       end
+
+      # A VM with iso: needs a template that consumes %(iso), and vice versa —
+      # otherwise bhyve sees an undefined config variable or an empty CD path.
+      def validate_iso_pairing!(vm)
+        if vm.entry.iso && !vm.template_wants_iso?
+          raise CommandError,
+                "template #{vm.entry.config} does not reference %(iso) (use an installer template)"
+        end
+        if !vm.entry.iso && vm.template_wants_iso?
+          raise CommandError,
+                "template #{vm.entry.config} references %(iso) but VM #{vm.name} has no iso"
+        end
+      end
     end
   end
 end

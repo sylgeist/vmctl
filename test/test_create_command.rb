@@ -152,4 +152,72 @@ class TestCreateCommand < Minitest::Test
       cmd.call(['pod35', '--network', 'labs_vlan50', '--disk', 'data:bogus'])
     end
   end
+
+  def write_installer_template
+    File.write(File.join(@config_dir, 'installer.conf'),
+               "cpus=2\npci.0.5.0.port.0.path=%(iso)\n")
+  end
+
+  def write_iso
+    iso = File.join(@dir, 'install.iso')
+    File.write(iso, 'iso')
+    iso
+  end
+
+  def test_create_iso_records_absolute_path
+    write_installer_template
+    iso = write_iso
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout do
+      cmd.call(['pod36', '--network', 'labs_vlan50',
+                '--config', 'installer.conf', '--iso', iso])
+    end
+    entry = VMCtl::Config.load(@inv).vms.fetch('pod36')
+    assert_equal iso, entry.iso
+  end
+
+  def test_create_iso_expands_relative_path
+    write_installer_template
+    write_iso
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    Dir.chdir(@dir) do
+      capture_stdout do
+        cmd.call(['pod36', '--network', 'labs_vlan50',
+                  '--config', 'installer.conf', '--iso', 'install.iso'])
+      end
+    end
+    entry = VMCtl::Config.load(@inv).vms.fetch('pod36')
+    assert_equal File.realpath(File.join(@dir, 'install.iso')), File.realpath(entry.iso)
+  end
+
+  def test_create_rejects_missing_iso_file
+    write_installer_template
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod36', '--network', 'labs_vlan50',
+                '--config', 'installer.conf', '--iso', '/nonexistent.iso'])
+    end
+    assert_match(/iso not found/, err.message)
+  end
+
+  def test_create_rejects_iso_when_template_lacks_reference
+    iso = write_iso
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      # default template pod.conf has no %(iso)
+      cmd.call(['pod36', '--network', 'labs_vlan50', '--iso', iso])
+    end
+    assert_match(/does not reference/, err.message)
+  end
+
+  def test_create_rejects_installer_template_without_iso
+    write_installer_template
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod36', '--network', 'labs_vlan50', '--config', 'installer.conf'])
+    end
+    assert_match(/references %\(iso\)/, err.message)
+  end
 end
