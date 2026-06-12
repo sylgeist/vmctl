@@ -59,6 +59,8 @@ A complete, self-consistent example set lives in [`examples/`](examples/):
   nvme disks, netgraph)
 - [`pod-cloudinit.conf`](examples/pod-cloudinit.conf) — template with an AHCI-CD
   device for the cloud-init seed ISO
+- [`pod-installer.conf`](examples/pod-installer.conf) — template with an AHCI-CD
+  device that boots an installer ISO via the `%(iso)` variable
 - [`user-data.yml`](examples/user-data.yml) — minimal NoCloud user-data
 
 ## Usage
@@ -102,6 +104,15 @@ block (`image_dir`, `root_size`, `root_from`):
     vmctl create pod35 --network labs_vlan50                      # single root disk from the default golden image
     vmctl create db1   --network labs_vlan50 --disk data:200G     # add a blank data disk
     vmctl create web1  --network labs_vlan50 --cloud-init ./web-userdata.yml --start
+    vmctl create pod36 --network labs_vlan50 --config pod-installer.conf --iso /bhyve/isos/freebsd-14.3.iso --start
+
+`--iso FILE` attaches an installer ISO: the path is stored (absolute) as `iso:`
+in the inventory and passed to bhyve as `-o iso=...` on every start. The VM's
+template must consume the `%(iso)` variable (see
+[`pod-installer.conf`](examples/pod-installer.conf)); `create` and `start`
+refuse a VM whose `iso:` and template don't agree. The ISO is referenced in
+place — never copied — and stays attached until you remove the `iso:` line;
+with UEFI this is harmless once the installed disk boots first.
 
 Templates stay opaque: vmctl creates exactly the disks in the VM's `disks:`
 list — your `.conf` template is responsible for referencing those paths (and,
