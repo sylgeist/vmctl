@@ -43,10 +43,12 @@ module VMCtl
 
     # True when the template consumes the %(iso) config variable on an active
     # (non-comment) line. False if the template file is missing — template
-    # existence is validated elsewhere.
+    # existence is validated elsewhere. Read as binary: templates are opaque
+    # byte streams, and the host locale (e.g. LANG=C => US-ASCII) must not
+    # make the scan raise on non-ASCII bytes in comments.
     def template_wants_iso?
       return false unless File.exist?(template_path)
-      File.foreach(template_path).any? do |line|
+      File.foreach(template_path, encoding: Encoding::BINARY).any? do |line|
         line.sub(/#.*/, '').include?('%(iso)')
       end
     end
