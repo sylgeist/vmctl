@@ -20,6 +20,7 @@ module VMCtl
               '-o', "network=#{@entry.network}",
               '-o', "link=#{@entry.link}"]
       argv += ['-o', "mac=#{@entry.mac}"] if @entry.mac
+      argv += ['-o', "iso=#{@entry.iso}"] if @entry.iso
       argv << name
       argv
     end
@@ -38,6 +39,16 @@ module VMCtl
 
     def template_path
       File.join(@defaults.config_dir, @entry.config)
+    end
+
+    # True when the template consumes the %(iso) config variable on an active
+    # (non-comment) line. False if the template file is missing — template
+    # existence is validated elsewhere.
+    def template_wants_iso?
+      return false unless File.exist?(template_path)
+      File.foreach(template_path).any? do |line|
+        line.sub(/#.*/, '').include?('%(iso)')
+      end
     end
 
     def dir
