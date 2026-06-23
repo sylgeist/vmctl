@@ -12,7 +12,7 @@ guest reboots. Your shared `.conf` templates stay pristine and external.
 
 ## Requirements
 
-- Ruby >= 3.0
+- Ruby >= 4.0
 - FreeBSD with `bhyve`, `bhyvectl`, `ngctl`, `cu` in PATH
 - Netgraph bridges created out of band (e.g. a `netgraph_setup` rc script)
 
