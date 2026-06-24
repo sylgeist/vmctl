@@ -19,6 +19,7 @@ require_relative 'commands/import'
 require_relative 'commands/destroy'
 require_relative 'commands/add_disk'
 require_relative 'commands/grow_disk'
+require_relative 'commands/remove_disk'
 
 module VMCtl
   module CLI
@@ -39,6 +40,7 @@ module VMCtl
         destroy <name>        Remove a VM (--purge also destroys its dataset).
         add-disk <name> <spec>  Add a disk (suffix:size[:from img]) to an existing VM.
         grow-disk <name> <sfx> <size>  Grow a disk and update the inventory.
+        remove-disk <name> <sfx> [--purge]  Remove a disk (optionally delete the file).
         list                  List configured VMs.
         help                  Show this message.
 
@@ -61,7 +63,8 @@ module VMCtl
       'import'  => Commands::Import,
       'destroy'  => Commands::Destroy,
       'add-disk'  => Commands::AddDisk,
-      'grow-disk' => Commands::GrowDisk
+      'grow-disk' => Commands::GrowDisk,
+      'remove-disk' => Commands::RemoveDisk
     }.freeze
 
     def self.run(argv)
