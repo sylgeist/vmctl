@@ -13,6 +13,7 @@ module VMCtl
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
+    :options,
     keyword_init: true
   )
   Disk = Struct.new(:file, :size, :from, keyword_init: true)
@@ -115,7 +116,8 @@ module VMCtl
         autostart:  body.fetch('autostart', false),
         disks:      parse_disks(body.fetch('disks', [])),
         cloud_init: body['cloud_init'],
-        iso:        body['iso']
+        iso:        body['iso'],
+        options:    parse_options(body.fetch('options', {}))
       )
     end
 
@@ -133,6 +135,12 @@ module VMCtl
       end
     end
 
+    def parse_options(h)
+      h ||= {}
+      raise ConfigError, "'options' must be a mapping" unless h.is_a?(Hash)
+      h
+    end
+
     def vm_to_h(vm)
       h = {
         'config'  => vm.config,
@@ -144,6 +152,7 @@ module VMCtl
       }
       h['cloud_init'] = vm.cloud_init if vm.cloud_init
       h['iso'] = vm.iso if vm.iso
+      h['options'] = vm.options unless vm.options.nil? || vm.options.empty?
       h
     end
 
