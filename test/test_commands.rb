@@ -14,32 +14,47 @@ require 'tempfile'
 require 'tmpdir'
 
 module CmdTestSupport
-  INVENTORY = <<~YAML
-    defaults:
-      config_dir: /bhyve/configs
-      vm_root: /bhyve
-      zpool: tank/bhyve
-      link_base: 10
-      run_dir: /tmp/vmctl-test-run
-      log_dir: /tmp/vmctl-test-log
-    vms:
-      pod34:
-        config: pod.conf
-        network: labs_vlan50
-        link: 10
-        autostart: true
-        disks: [{ file: pod34-root.raw, size: 20G }]
-      pod35:
-        config: pod.conf
-        network: labs_vlan50
-        link: 11
-        autostart: false
-        disks: [{ file: pod35-root.raw, size: 20G }]
-  YAML
+  def config_dir
+    @config_dir ||= begin
+      d = Dir.mktmpdir
+      File.write(File.join(d, 'pod.conf'),
+                 "cpus=2\nlpc.com1.path=/dev/nmdm%(link)A\n")
+      d
+    end
+  end
+
+  def run_dir
+    @run_dir ||= Dir.mktmpdir
+  end
+
+  def inventory
+    <<~YAML
+      defaults:
+        config_dir: #{config_dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: #{run_dir}
+        log_dir: #{run_dir}
+      vms:
+        pod34:
+          config: pod.conf
+          network: labs_vlan50
+          link: 10
+          autostart: true
+          disks: [{ file: pod34-root.raw, size: 20G }]
+        pod35:
+          config: pod.conf
+          network: labs_vlan50
+          link: 11
+          autostart: false
+          disks: [{ file: pod35-root.raw, size: 20G }]
+    YAML
+  end
 
   def load_config
     f = Tempfile.new(['inv', '.yml'])
-    f.write(INVENTORY)
+    f.write(inventory)
     f.flush
     VMCtl::Config.load(f.path)
   end
@@ -148,7 +163,20 @@ class TestStartCommand < Minitest::Test
     out = capture_stdout { cmd.call(['pod34']) }
     assert_empty started, "dry-run must not start a supervisor"
     assert_match(/\[dry-run\]/, out)
-    assert_match(%r{bhyve -k /bhyve/configs/pod\.conf}, out)
+    assert_match(%r{bhyve -k .*/pod34\.conf pod34}, out)
+  end
+
+  def test_start_writes_ephemeral_config
+    exec = FakeExecutor.new(
+      probes: { 'ngctl info labs_vlan50:' => true, '/dev/vmm/pod34' => false }
+    )
+    factory = ->(_vm, **) { FakeSupervisor.new }
+    cmd = VMCtl::Commands::Start.new(config: load_config, executor: exec,
+                                     supervisor_factory: factory)
+    capture_stdout { cmd.call(['pod34']) }
+    written = File.read(File.join(run_dir, 'pod34.conf'))
+    assert_match(/^cpus=2$/, written)
+    assert_match(%r{^pci\.0\.3\.0\.path=/bhyve/pod34/pod34-root\.raw$}, written)
   end
 
   def config_for_iso(template_body:, iso:)
@@ -240,6 +268,6 @@ class TestRestartCommand < Minitest::Test
     cmd = VMCtl::Commands::Restart.new(config: load_config, executor: exec)
     out = capture_stdout { cmd.call(['pod34']) }
     assert_match(/pod34/, out)
-    assert_match(%r{bhyve -k /bhyve/configs/pod\.conf}, out, "start invocation printed after stop")
+    assert_match(%r{bhyve -k .*/pod34\.conf pod34}, out, "start invocation printed after stop")
   end
 end
