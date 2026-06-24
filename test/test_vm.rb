@@ -2,6 +2,7 @@
 # test/test_vm.rb
 require 'test_helper'
 require 'tmpdir'
+require 'fileutils'
 require 'vmctl/config'
 require 'vmctl/vm'
 
@@ -23,26 +24,40 @@ class TestVM < Minitest::Test
     )
   end
 
-  def test_bhyve_argv_without_mac
+  def test_config_path_in_run_dir
     vm = VMCtl::VM.new(entry, defaults)
-    assert_equal(
-      ['bhyve', '-k', '/bhyve/configs/pod.conf',
-       '-o', 'network=labs_vlan50', '-o', 'link=10', 'pod34'],
-      vm.bhyve_argv
-    )
+    assert_equal '/var/run/vmctl/pod34.conf', vm.config_path
   end
 
-  def test_bhyve_argv_includes_mac_when_set
-    vm = VMCtl::VM.new(entry(mac: '5a:9c:fc:01:02:03'), defaults)
-    assert_includes vm.bhyve_argv, 'mac=5a:9c:fc:01:02:03'
+  def test_bhyve_argv_references_ephemeral_config
+    vm = VMCtl::VM.new(entry, defaults)
+    assert_equal(['bhyve', '-k', '/var/run/vmctl/pod34.conf', 'pod34'], vm.bhyve_argv)
   end
 
   def test_bhyve_command_is_joined_string
     vm = VMCtl::VM.new(entry, defaults)
-    assert_equal(
-      'bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 pod34',
-      vm.bhyve_command
-    )
+    assert_equal 'bhyve -k /var/run/vmctl/pod34.conf pod34', vm.bhyve_command
+  end
+
+  def test_render_and_write_config
+    Dir.mktmpdir do |dir|
+      cfgdir = File.join(dir, 'configs'); FileUtils.mkdir_p(cfgdir)
+      File.write(File.join(cfgdir, 'pod.conf'),
+                 "cpus=2\nlpc.com1.path=/dev/nmdm%(link)A\n")
+      run = File.join(dir, 'run')
+      d = VMCtl::Defaults.new(
+        config_dir: cfgdir, vm_root: '/bhyve', zpool: 'tank/bhyve',
+        template: 'pod.conf', link_base: 10, run_dir: run, log_dir: '/l'
+      )
+      vm = VMCtl::VM.new(entry, d)
+      text = vm.render_config
+      assert_match(/^cpus=2$/, text)
+      assert_match(%r{^lpc\.com1\.path=/dev/nmdm10A$}, text)
+      assert_match(%r{^pci\.0\.3\.0\.path=/bhyve/pod34/pod34-root\.raw$}, text)
+      path = vm.write_config
+      assert_equal File.join(run, 'pod34.conf'), path
+      assert_equal text, File.binread(path)
+    end
   end
 
   def test_paths
@@ -53,39 +68,6 @@ class TestVM < Minitest::Test
     assert_equal '/dev/vmm/pod34', vm.vmm_device
     assert_equal '/dev/nmdm10B', vm.console_device
     assert_equal ['/bhyve/pod34/pod34-root.raw'], vm.disk_paths
-  end
-
-  def test_dump_command_inserts_config_dump_before_name
-    vm = VMCtl::VM.new(entry, defaults)
-    assert_equal(
-      'bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 ' \
-      '-o config.dump=1 pod34',
-      vm.dump_command
-    )
-  end
-
-  def test_dump_command_with_mac_keeps_order
-    vm = VMCtl::VM.new(entry(mac: '5a:9c:fc:01:02:03'), defaults)
-    assert_equal(
-      'bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 ' \
-      '-o mac=5a:9c:fc:01:02:03 -o config.dump=1 pod34',
-      vm.dump_command
-    )
-  end
-
-  def test_bhyve_argv_includes_iso_when_set
-    vm = VMCtl::VM.new(entry(iso: '/bhyve/isos/install.iso'), defaults)
-    assert_includes vm.bhyve_argv, 'iso=/bhyve/isos/install.iso'
-  end
-
-  def test_bhyve_argv_omits_iso_when_nil
-    vm = VMCtl::VM.new(entry, defaults)
-    refute(vm.bhyve_argv.any? { |a| a.start_with?('iso=') })
-  end
-
-  def test_dump_command_includes_iso_when_set
-    vm = VMCtl::VM.new(entry(iso: '/bhyve/isos/install.iso'), defaults)
-    assert_includes vm.dump_command, '-o iso=/bhyve/isos/install.iso'
   end
 
   def test_template_wants_iso_detects_reference
