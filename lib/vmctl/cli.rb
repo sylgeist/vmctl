@@ -18,6 +18,7 @@ require_relative 'commands/create'
 require_relative 'commands/import'
 require_relative 'commands/destroy'
 require_relative 'commands/add_disk'
+require_relative 'commands/grow_disk'
 
 module VMCtl
   module CLI
@@ -37,6 +38,7 @@ module VMCtl
         import <name>         Adopt an existing (zfs-recv'd) VM's disks.
         destroy <name>        Remove a VM (--purge also destroys its dataset).
         add-disk <name> <spec>  Add a disk (suffix:size[:from img]) to an existing VM.
+        grow-disk <name> <sfx> <size>  Grow a disk and update the inventory.
         list                  List configured VMs.
         help                  Show this message.
 
@@ -58,7 +60,8 @@ module VMCtl
       'create'  => Commands::Create,
       'import'  => Commands::Import,
       'destroy'  => Commands::Destroy,
-      'add-disk' => Commands::AddDisk
+      'add-disk'  => Commands::AddDisk,
+      'grow-disk' => Commands::GrowDisk
     }.freeze
 
     def self.run(argv)
