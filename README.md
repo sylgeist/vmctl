@@ -42,10 +42,10 @@ vms:
       - { file: pod34-root.raw, size: 20G }
 ```
 
-At `start`, vmctl reconstructs the same invocation you would run by hand:
+At `start`, vmctl renders an ephemeral config from the template and invocation supervisory management:
 
 ```sh
-bhyve -k /bhyve/configs/pod.conf -o network=labs_vlan50 -o link=10 pod34
+bhyve -k /var/run/vmctl/pod34.conf pod34
 ```
 
 and supervises it: when the guest reboots, bhyve exits and vmctl relaunches it;
@@ -107,7 +107,7 @@ block (`image_dir`, `root_size`, `root_from`):
     vmctl create pod36 --network labs_vlan50 --config pod-installer.conf --iso /bhyve/isos/freebsd-14.3.iso --start
 
 `--iso FILE` attaches an installer ISO: the path is stored (absolute) as `iso:`
-in the inventory and passed to bhyve as `-o iso=...` on every start. The VM's
+in the inventory and substituted into the ephemeral /var/run/vmctl/<name>.conf on every start. The VM's
 template must consume the `%(iso)` variable (see
 [`pod-installer.conf`](examples/pod-installer.conf)); `create` and `start`
 refuse a VM whose `iso:` and template don't agree. The ISO is referenced in
