@@ -49,11 +49,18 @@ layers (lowest → highest precedence):
 2. **Per-VM `options:`** — a new optional inventory map of raw bhyve keys merged
    on top of the base, for one-off tweaks (`cpus`, `memory.size`, an extra
    device) without forking a base file.
-3. **vmctl-managed keys** — disks (generated from `disks:`) and the iso CD
-   device (when `iso:` is set). Applied last, so they always win: an `options:`
+3. **vmctl-managed keys** — the *generated* keys. For now this is **disks only**
+   (`pci.0.3.N.*` from `disks:`). Applied last, so they always win: an `options:`
    entry that collides with a managed `pci.*` disk key is overwritten (managed
-   topology stays authoritative). Net/link/mac stay in the base via `%()`
-   substitution (unchanged behavior, just resolved by vmctl).
+   topology stays authoritative). Net/link/mac/iso and the installer/cloud-init
+   **CD devices stay in the flavor file** via `%()` substitution (unchanged
+   behavior, just resolved by vmctl instead of bhyve).
+
+> **Decision (Variant A):** only disks are generated; the iso CD and cloud-init
+> seed CD remain template-owned. This keeps the working `create --iso` and
+> cloud-init paths and the iso/template pairing check intact while still solving
+> the disk-topology goal. The renderer is structured (see *Extensibility*) so
+> promoting net/iso/seed to generated injectors later is purely additive.
 
 Order within the rendered file does not matter to bhyve (it's a namespace); the
 renderer emits keys **sorted** for deterministic output and testability. Comments
@@ -73,31 +80,36 @@ class ConfigRenderer
 
   # vm: a VM. Returns the fully-resolved bhyve config as a String.
   def render(vm)
-    base   = substitute(File.read(vm.template_path), vm)  # %() -> concrete
-    pairs  = parse_pairs(base)                              # [[k,v],...]
-    map    = pairs.to_h
-    map.merge!(stringify(vm.entry.options || {}))           # layer 2
-    map.merge!(disk_keys(vm))                               # layer 3 (disks)
-    map.merge!(iso_keys(vm)) if vm.entry.iso                # layer 3 (iso)
+    base = substitute(File.read(vm.template_path), vm)   # %() -> concrete
+    map  = parse_pairs(base).to_h                          # layer 1 (flavor)
+    map.merge!(stringify(vm.entry.options || {}))          # layer 2 (overrides)
+    GENERATORS.each { |g| map.merge!(g.call(vm)) }         # layer 3 (managed)
     map.sort.map { |k, v| "#{k}=#{v}" }.join("\n") + "\n"
   end
+
+  # Ordered list of managed-key generators. Today: disks only. Adding net/iso/
+  # seed injection later means appending a generator here — no other change.
+  GENERATORS = [method(:disk_keys)].freeze
 end
 ```
 
-- `substitute` resolves `%(name) %(network) %(link) %(mac)` against the entry
-  (same variables bhyve substitutes today; we resolve them so the ephemeral file
-  is fully concrete).
+- `substitute` resolves `%(name) %(network) %(link) %(mac) %(iso)` against the
+  entry (the same variables bhyve substitutes today; we resolve them so the
+  ephemeral file is fully concrete). `nil` mac/iso substitute to the empty
+  string — pairing validation (kept, below) prevents a meaningful `%(iso)`
+  mismatch, and `%(mac)` is commented out in the shipped flavors.
 - `parse_pairs` reads `key=value` lines, skipping blanks and `#` comments.
 - `disk_keys` generates, for disk index *N* (0-based) over `vm.entry.disks`:
   `pci.0.3.N.device=nvme`, `pci.0.3.N.path=<vm.dir>/<disk.file>`. Disks occupy
   functions 0–7 of slot `pci.0.3` (**max 8 disks**; documented limit, spillover
   to another slot is a later concern). Root is index 0 by convention (it is the
   first disk in the entry).
-- `iso_keys` injects an AHCI CD-ROM device for `vm.entry.iso`, mirroring the
-  device keys used by the current installer template (see
-  `2026-06-12-vmctl-create-iso-design.md`) at a reserved slot
-  (⚙️ `pci.0.5`); exact keys finalized against that template during
-  implementation.
+
+The `GENERATORS` list is the extensibility seam: each generator is a pure
+`(vm) -> Hash` of managed keys merged last (so generated keys always beat the
+flavor and `options:`). Promoting the net block, the installer iso CD, or the
+cloud-init seed CD to code later is just adding a generator — no restructuring,
+no change to callers. (Out of scope now; see *Extensibility* and *Out of scope*.)
 
 ### `VM` changes (`lib/vmctl/vm.rb`)
 
@@ -109,9 +121,11 @@ end
   `run_dir`); returns the path. Called on the launch path.
 - **`bhyve_argv`** collapses to `['bhyve', '-k', config_path, name]`. The
   network/link/mac/iso `-o` overrides are gone — they're baked into the rendered
-  file.
-- **Removed:** `template_wants_iso?` and `dump_command` (see below);
+  file by the renderer's `%()` substitution.
+- **Removed:** `dump_command` (dump now renders directly, see below);
   `bhyve_command` stays (joins `bhyve_argv` for logging/dry-run display).
+- **Kept:** `template_wants_iso?` — still scans the flavor for `%(iso)` to drive
+  the pairing validation (the iso CD remains template-owned under Variant A).
 - `template_path` is retained but now points at the **base flavor** file.
 
 ### Launch path
@@ -120,30 +134,48 @@ end
   (already makes `run_dir`/`log_dir`) add `@vm.write_config`. The reboot loop
   reuses the same file (inventory is fixed for a supervisor's lifetime;
   "always-latest" is achieved by re-rendering on each `vmctl start`).
-- **`Commands::Start#start_one`** dry-run branch prints `vm.render_config`
-  (what *would* launch) instead of only the command string.
-- **`validate_iso_pairing!`** (in `Commands::Base`) is **removed**, along with
-  its calls in `start`/`create`. Iso pairing is no longer a template concern —
-  the renderer injects the CD device iff `iso:` is set.
+- **`Commands::Start#start_one`** writes the config (`vm.write_config`) in the
+  parent, before forking the supervisor (so the file exists at spawn and the
+  supervisor stays unchanged). The dry-run branch keeps printing
+  `vm.bhyve_command` (now `bhyve -k <run_dir>/<name>.conf <name>`) — filesystem-
+  light, no template read; `dump` is the way to see the full resolved config.
+- **`validate_iso_pairing!`** (in `Commands::Base`) is **kept**, with its calls in
+  `start`/`create` unchanged. Under Variant A the iso CD remains template-owned,
+  so the `iso:` ⇔ flavor-`%(iso)` pairing check is still meaningful.
 
 ### `dump` becomes a renderer
 
-`Commands::Dump` prints `vm.render_config` directly (no bhyve subprocess needed
-for the common case). ⚙️ Optionally it may still pipe the rendered file through
-`bhyve -k <file> -o config.dump=1` to show bhyve's own parse; default to printing
-the rendered text (simpler, no bhyve dependency, works with no disks present).
-`VM#dump_command` is removed.
+`Commands::Dump` prints `vm.render_config` directly (no bhyve subprocess needed).
+This is simpler than the current `config.dump=1` subprocess, has no bhyve
+dependency, and works with no disks present. `VM#dump_command` is removed.
 
 ### Migration
 
-- Ship `examples/base.conf` (renamed/trimmed from `pod.conf`) **without** the
-  `pci.0.3.*` disk lines. Optionally ship a second flavor to demonstrate the
-  pattern.
-- Document in the README that base/template files must no longer declare disks
+- Ship `examples/base.conf` (trimmed from `pod.conf`) **without** the
+  `pci.0.3.*` disk lines. The installer/cloud-init flavors
+  (`pod-installer.conf`, `pod-cloudinit.conf`) keep their CD devices but also
+  drop their `pci.0.3.*` disk lines.
+- Document in the README that base/flavor files must no longer declare disks
   (vmctl injects them) and that `run_dir/<name>.conf` is ephemeral, regenerated
   each start, and must not be hand-edited.
 - Pre-1.0, single-operator deployment: a clean break is acceptable; no automatic
   template rewriting.
+
+### Extensibility (future rewiring)
+
+Per the operator's direction, Variant A must not box in a future move toward more
+generated wiring (dynamic cloud-init especially). The design keeps that path open:
+
+- **`GENERATORS` seam** — managed keys come from an ordered list of pure
+  `(vm) -> Hash` generators merged last. Promoting the net block, the installer
+  iso CD, or the cloud-init seed CD to code is *appending a generator*; nothing
+  else moves. The renderer's public surface (`render`/`write_config`) is stable.
+- **No template-shape assumptions** — generators emit keys into the flat map and
+  always win, so a future generator can take over a key currently set by a flavor
+  without conflict (and the flavor line can be dropped at leisure).
+- **Cloud-init is deliberately untouched here** — its richer dynamic-config
+  surface (templated user-data, per-VM seed contents) is its own future spec; this
+  design just avoids foreclosing it.
 
 ### `Config` changes
 
@@ -198,10 +230,12 @@ notice (the guest does not see the new/grown file until reboot).
 
 Edits scalar inventory fields, mirroring `create`'s options:
 `--autostart/--no-autostart`, `--network NET` (re-validates the bridge via
-`Netgraph#ensure_bridge!`), `--mac MAC|generate`, `--config TMPL` (base flavor),
-`--iso FILE|--no-iso`, `--cloud-init FILE`. Only provided flags change; others
+`Netgraph#ensure_bridge!`), `--mac MAC|generate`, `--config TMPL` (base flavor;
+validates the file exists), `--iso FILE|--no-iso` (expands to absolute, validates
+the file exists and the flavor/iso pairing). Only provided flags change; others
 are untouched. Save. Prints a summary of changed fields + next-boot notice if
-running.
+running. **`--cloud-init` is intentionally excluded** (it requires rebuilding the
+seed ISO) and is deferred to the future dynamic-cloud-init work.
 
 ### CLI wiring (`lib/vmctl/cli.rb`)
 
@@ -219,9 +253,10 @@ running.
 
 ## Testing
 
-- **`ConfigRenderer`** (unit, pure): `%()` substitution; N-disk slot generation
-  (0, 1, 8 disks); `options:` override precedence; managed keys beat colliding
-  `options:`; iso present/absent; deterministic sorted output.
+- **`ConfigRenderer`** (unit, pure): `%(name|network|link|mac|iso)` substitution
+  (including a flavor that consumes `%(iso)`); N-disk slot generation (0, 1, 8
+  disks); `options:` override precedence; managed disk keys beat a colliding
+  `options:` disk key; deterministic sorted output.
 - **`VM`**: `config_path`, `bhyve_argv` reduces to `bhyve -k <path> <name>`,
   `write_config` writes resolved text.
 - **`Supervisor`**: `start` writes the config (assert file content) before
@@ -238,6 +273,10 @@ running.
 
 - `set --option key=value` editing of the `options:` map (obvious later add).
 - More than 8 disks / multi-slot disk spillover.
+- Generating the net block / iso CD / cloud-init seed CD in code (the `GENERATORS`
+  seam exists for this, but it stays template-owned under Variant A).
+- Dynamic cloud-init (templated user-data, per-VM seed contents) — its own future
+  spec; this design only avoids foreclosing it.
 - Automatic template migration / rewriting of existing templates.
 - Live hot-plug (bhyve can't, in this setup) — all changes are next-boot.
 - Shrinking disks.
