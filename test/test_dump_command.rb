@@ -2,29 +2,32 @@
 # test/test_dump_command.rb
 require 'test_helper'
 require 'stringio'
+require 'tmpdir'
 require 'vmctl/config'
 require 'vmctl/commands/dump'
 require 'tempfile'
 
 class TestDumpCommand < Minitest::Test
-  INVENTORY = <<~YAML
-    defaults:
-      config_dir: /bhyve/configs
-      vm_root: /bhyve
-      zpool: tank/bhyve
-      template: pod.conf
-      link_base: 10
-    vms:
-      pod34:
-        config: pod.conf
-        network: labs_vlan50
-        link: 10
-        disks: []
-  YAML
-
-  def load_config
+  def load_config(template: "cpus=2\nmemory.size=4G\nlpc.com1.path=/dev/nmdm%(link)A\n",
+                  config: 'pod.conf')
+    dir = Dir.mktmpdir
+    File.write(File.join(dir, 'pod.conf'), template)
+    inv = <<~YAML
+      defaults:
+        config_dir: #{dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: /var/run/vmctl
+      vms:
+        pod34:
+          config: #{config}
+          network: labs_vlan50
+          link: 10
+          disks: [{ file: pod34-root.raw, size: 20G }]
+    YAML
     f = Tempfile.new(['inv', '.yml'])
-    f.write(INVENTORY)
+    f.write(inv)
     f.flush
     VMCtl::Config.load(f.path)
   end
@@ -35,23 +38,12 @@ class TestDumpCommand < Minitest::Test
     $stdout = STDOUT
   end
 
-  def test_dump_prints_config_despite_nonzero_exit
-    # bhyve config.dump exits non-zero by design; FakeExecutor#capture_unchecked
-    # models that. The captured stdout must still be printed.
-    exec = FakeExecutor.new(captures: { 'config.dump=1' => "config.dump=1\ncpus=2\nmemory.size=4G\n" })
-    cmd = VMCtl::Commands::Dump.new(config: load_config, executor: exec)
+  def test_dump_prints_rendered_config
+    cmd = VMCtl::Commands::Dump.new(config: load_config, executor: FakeExecutor.new)
     out = capture_stdout { cmd.call(['pod34']) }
-    assert(exec.captures.any? { |c| c.include?('-o config.dump=1') && c.include?('pod34') })
-    assert_match(/memory\.size=4G/, out)
-  end
-
-  def test_dump_raises_when_no_config_produced
-    # No stdout + an error on stderr => a genuine bhyve failure (e.g. bad template).
-    exec = FakeExecutor.new(errs: { 'config.dump=1' => 'bhyve: failed to parse config file' })
-    cmd = VMCtl::Commands::Dump.new(config: load_config, executor: exec)
-    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
-    assert_match(/could not dump config/, err.message)
-    assert_match(/failed to parse/, err.message)
+    assert_match(/^memory\.size=4G$/, out)
+    assert_match(%r{^pci\.0\.3\.0\.path=/bhyve/pod34/pod34-root\.raw$}, out)
+    assert_match(%r{^lpc\.com1\.path=/dev/nmdm10A$}, out)
   end
 
   def test_dump_requires_a_name
@@ -62,5 +54,12 @@ class TestDumpCommand < Minitest::Test
   def test_dump_unknown_vm
     cmd = VMCtl::Commands::Dump.new(config: load_config, executor: FakeExecutor.new)
     assert_raises(VMCtl::Commands::CommandError) { cmd.call(['ghost']) }
+  end
+
+  def test_dump_missing_flavor_file_raises
+    cmd = VMCtl::Commands::Dump.new(config: load_config(config: 'nope.conf'),
+                                    executor: FakeExecutor.new)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
+    assert_match(/could not render config/, err.message)
   end
 end
