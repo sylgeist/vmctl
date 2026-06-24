@@ -180,4 +180,72 @@ class TestConfig < Minitest::Test
     refute cfg.vms.key?('pod99')
     f.close
   end
+
+  def test_options_default_empty
+    f = write_inventory(VALID_INVENTORY)
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal({}, cfg.vms.fetch('pod34').options)
+    f.close
+  end
+
+  def test_options_parsed_and_roundtrip
+    inv = <<~YAML
+      defaults: { config_dir: /c, vm_root: /v, zpool: tank, link_base: 10 }
+      vms:
+        pod34:
+          network: labs_vlan50
+          link: 10
+          disks: []
+          options:
+            cpus: 4
+            memory.size: 8G
+    YAML
+    f = write_inventory(inv)
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal({ 'cpus' => 4, 'memory.size' => '8G' }, cfg.vms.fetch('pod34').options)
+
+    out = Tempfile.new(['out', '.yml'])
+    cfg.save(out.path)
+    reloaded = VMCtl::Config.load(out.path)
+    assert_equal({ 'cpus' => 4, 'memory.size' => '8G' }, reloaded.vms.fetch('pod34').options)
+    f.close; out.close
+  end
+
+  def test_options_absent_not_emitted
+    f = write_inventory(VALID_INVENTORY)
+    cfg = VMCtl::Config.load(f.path)
+    out = Tempfile.new(['out', '.yml'])
+    cfg.save(out.path)
+    refute_match(/options:/, File.read(out.path))
+    f.close; out.close
+  end
+
+  def test_options_must_be_mapping
+    inv = "vms:\n  pod34:\n    network: n\n    link: 10\n    disks: []\n    options: [1,2]\n"
+    f = write_inventory(inv)
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_disk_parse_basic
+    d = VMCtl::Disk.parse('pod34', 'data:50G')
+    assert_equal 'pod34-data.raw', d.file
+    assert_equal '50G', d.size
+    assert_nil d.from
+  end
+
+  def test_disk_parse_with_from
+    d = VMCtl::Disk.parse('pod34', 'data:50G:from gold.raw')
+    assert_equal 'pod34-data.raw', d.file
+    assert_equal '50G', d.size
+    assert_equal 'gold.raw', d.from
+  end
+
+  def test_disk_parse_rejects_missing_size
+    assert_raises(ArgumentError) { VMCtl::Disk.parse('pod34', 'data') }
+  end
+
+  def test_disk_parse_rejects_empty_suffix
+    assert_raises(ArgumentError) { VMCtl::Disk.parse('pod34', ':50G') }
+  end
 end

@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 # lib/vmctl/vm.rb
+require 'fileutils'
+require_relative 'config_renderer'
 module VMCtl
   # One VM: turns an inventory entry + defaults into the exact bhyve invocation
   # and the on-disk paths vmctl manages.
@@ -15,26 +17,26 @@ module VMCtl
       @entry.name
     end
 
+    def config_path
+      File.join(@defaults.run_dir, "#{name}.conf")
+    end
+
+    def render_config
+      ConfigRenderer.new(@defaults).render(self)
+    end
+
+    def write_config
+      FileUtils.mkdir_p(@defaults.run_dir)
+      File.binwrite(config_path, render_config)
+      config_path
+    end
+
     def bhyve_argv
-      argv = ['bhyve', '-k', template_path,
-              '-o', "network=#{@entry.network}",
-              '-o', "link=#{@entry.link}"]
-      argv += ['-o', "mac=#{@entry.mac}"] if @entry.mac
-      argv += ['-o', "iso=#{@entry.iso}"] if @entry.iso
-      argv << name
-      argv
+      ['bhyve', '-k', config_path, name]
     end
 
     def bhyve_command
       bhyve_argv.join(' ')
-    end
-
-    # Like bhyve_command, but appends `-o config.dump=1` so bhyve prints the
-    # fully-resolved config and exits without booting.
-    def dump_command
-      argv = bhyve_argv
-      argv.insert(-2, '-o', 'config.dump=1')
-      argv.join(' ')
     end
 
     def template_path

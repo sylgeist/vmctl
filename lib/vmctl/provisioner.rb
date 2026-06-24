@@ -16,6 +16,11 @@ module VMCtl
       @exec.run("zfs create #{@defaults.zpool}/#{vm.name}")
     end
 
+    # Grow an existing raw disk in place. Caller validates new > current.
+    def grow_disk(path, size)
+      @exec.run("truncate -s #{size} #{path}")
+    end
+
     # path: absolute target raw file. size: human size string. from: bare image
     # name (resolved via image_dir) or nil for a blank sparse file.
     def create_disk(path, size, from: nil)

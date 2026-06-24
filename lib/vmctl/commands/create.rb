@@ -77,15 +77,10 @@ module VMCtl
         )
       end
 
-      # --disk grammar: "<suffix>:<size>[:from <image>]"
-      #   e.g. "zfs:100G" or "data:50G:from gold.raw"
       def parse_disk(name, spec)
-        body, from = spec.split(':from ', 2)
-        suffix, size = body.split(':', 2)
-        if suffix.to_s.empty? || size.to_s.empty?
-          raise CommandError, "invalid --disk #{spec.inspect} (expected suffix:size)"
-        end
-        Disk.new(file: "#{name}-#{suffix}.raw", size: size, from: from)
+        Disk.parse(name, spec)
+      rescue ArgumentError
+        raise CommandError, "invalid --disk #{spec.inspect} (expected suffix:size)"
       end
 
       def resolve_mac(allocator, name, mac)

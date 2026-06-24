@@ -34,6 +34,21 @@ module VMCtl
         end
       end
 
+      # Print a "takes effect on next start" notice when the VM is running.
+      # All modify commands edit the inventory, which is re-rendered at start.
+      def note_next_boot(vm, what)
+        return unless vm.running?(executor)
+        puts "note: #{vm.name} is running; #{what} takes effect on next start"
+      end
+
+      # Resolve a disk on a VM by its suffix (file is "<name>-<suffix>.raw").
+      def disk_for(vm, suffix)
+        file = "#{vm.name}-#{suffix}.raw"
+        disk = vm.entry.disks.find { |d| d.file == file }
+        raise CommandError, "#{vm.name} has no disk '#{suffix}'" unless disk
+        disk
+      end
+
       # A VM with iso: needs a template that consumes %(iso), and vice versa —
       # otherwise bhyve sees an undefined config variable or an empty CD path.
       def validate_iso_pairing!(vm)

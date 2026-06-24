@@ -1,8 +1,8 @@
 # Example vmctl inventory.
 #
 # Copy to /usr/local/etc/vmctl/inventory.yml (or pass with `vmctl -c FILE`).
-# This is the single source of truth: vmctl reads/writes it and reconstructs the
-# exact `bhyve -k <template> -o ...` invocation for each VM from these values.
+# This is the single source of truth: vmctl reads/writes it and renders ephemeral
+# /var/run/vmctl/<name>.conf configs from the template, substituting placeholders.
 
 defaults:
   config_dir: /bhyve/configs   # where the shared .conf templates live

@@ -13,9 +13,21 @@ module VMCtl
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
+    :options,
     keyword_init: true
   )
-  Disk = Struct.new(:file, :size, :from, keyword_init: true)
+  Disk = Struct.new(:file, :size, :from, keyword_init: true) do
+    # spec grammar: "<suffix>:<size>[:from <image>]"
+    #   e.g. "zfs:100G" or "data:50G:from gold.raw"
+    def self.parse(name, spec)
+      body, from = spec.to_s.split(':from ', 2)
+      suffix, size = body.to_s.split(':', 2)
+      if suffix.to_s.empty? || size.to_s.empty?
+        raise ArgumentError, "invalid disk spec #{spec.inspect} (expected suffix:size)"
+      end
+      new(file: "#{name}-#{suffix}.raw", size: size, from: from)
+    end
+  end
 
   class Config
     DEFAULTS = {
@@ -115,7 +127,8 @@ module VMCtl
         autostart:  body.fetch('autostart', false),
         disks:      parse_disks(body.fetch('disks', [])),
         cloud_init: body['cloud_init'],
-        iso:        body['iso']
+        iso:        body['iso'],
+        options:    parse_options(body.fetch('options', {}))
       )
     end
 
@@ -133,6 +146,12 @@ module VMCtl
       end
     end
 
+    def parse_options(h)
+      h ||= {}
+      raise ConfigError, "'options' must be a mapping" unless h.is_a?(Hash)
+      h
+    end
+
     def vm_to_h(vm)
       h = {
         'config'  => vm.config,
@@ -144,6 +163,7 @@ module VMCtl
       }
       h['cloud_init'] = vm.cloud_init if vm.cloud_init
       h['iso'] = vm.iso if vm.iso
+      h['options'] = vm.options unless vm.options.nil? || vm.options.empty?
       h
     end
 

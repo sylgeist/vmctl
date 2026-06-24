@@ -61,4 +61,11 @@ class TestProvisioner < Minitest::Test
     assert_includes exec.runs, "cp #{img} /bhyve/pod35/pod35-root.raw"
     refute(exec.runs.any? { |c| c.start_with?('truncate') }, 'no grow when size == source')
   end
+
+  def test_grow_disk_runs_truncate
+    exec = FakeExecutor.new
+    prov = VMCtl::Provisioner.new(exec, nil)
+    prov.grow_disk('/bhyve/pod34/pod34-data.raw', '100G')
+    assert_includes exec.runs, 'truncate -s 100G /bhyve/pod34/pod34-data.raw'
+  end
 end

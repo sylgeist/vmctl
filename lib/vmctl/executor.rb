@@ -41,17 +41,6 @@ module VMCtl
       raise ExecutorError, "command not found: #{cmd.split.first}"
     end
 
-    # Run a command and return [stdout, stderr, exitstatus] WITHOUT raising on a
-    # non-zero exit. For commands that exit non-zero by design — e.g. bhyve with
-    # config.dump=1, which prints the resolved config to stdout and exits 1.
-    def capture_unchecked(cmd)
-      VMCtl.logger.debug("exec (unchecked): #{cmd}")
-      stdout, stderr, status = Open3.capture3(cmd)
-      [stdout, stderr, status.exitstatus]
-    rescue Errno::ENOENT
-      raise ExecutorError, "command not found: #{cmd.split.first}"
-    end
-
     # Probe: true/false by exit status, never raises.
     def success?(cmd)
       VMCtl.logger.debug("probe: #{cmd}")
