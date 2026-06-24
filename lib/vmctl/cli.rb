@@ -17,6 +17,7 @@ require_relative 'commands/dump'
 require_relative 'commands/create'
 require_relative 'commands/import'
 require_relative 'commands/destroy'
+require_relative 'commands/add_disk'
 
 module VMCtl
   module CLI
@@ -35,6 +36,7 @@ module VMCtl
         create <name>         Allocate + provision a new VM (--network NET).
         import <name>         Adopt an existing (zfs-recv'd) VM's disks.
         destroy <name>        Remove a VM (--purge also destroys its dataset).
+        add-disk <name> <spec>  Add a disk (suffix:size[:from img]) to an existing VM.
         list                  List configured VMs.
         help                  Show this message.
 
@@ -55,7 +57,8 @@ module VMCtl
       'dump'    => Commands::Dump,
       'create'  => Commands::Create,
       'import'  => Commands::Import,
-      'destroy' => Commands::Destroy
+      'destroy'  => Commands::Destroy,
+      'add-disk' => Commands::AddDisk
     }.freeze
 
     def self.run(argv)
