@@ -35,7 +35,7 @@ module VMCtl
         restart <name>        Graceful stop then start.
         status [name]         Running/stopped, pid, link, network.
         console <name>        Attach to the VM's nmdm console.
-        dump <name>           Print the VM's fully-resolved bhyve config (config.dump).
+        dump <name>           Print the VM's fully-resolved bhyve config.
         create <name>         Allocate + provision a new VM (--network NET).
         import <name>         Adopt an existing (zfs-recv'd) VM's disks.
         destroy <name>        Remove a VM (--purge also destroys its dataset).

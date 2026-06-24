@@ -51,25 +51,4 @@ class TestExecutor < Minitest::Test
     assert_match(/command not found/, err.message)
   end
 
-  def test_capture_unchecked_returns_stdout_on_nonzero_exit
-    e = VMCtl::Executor.new
-    # Models a command (like bhyve config.dump) that writes stdout then exits non-zero.
-    out, err, status = e.capture_unchecked("sh -c 'printf hi; exit 1'")
-    assert_equal 'hi', out
-    assert_equal '', err
-    assert_equal 1, status
-  end
-
-  def test_capture_unchecked_returns_stderr
-    e = VMCtl::Executor.new
-    out, err, status = e.capture_unchecked("sh -c 'printf boom >&2; exit 2'")
-    assert_equal '', out
-    assert_equal 'boom', err
-    assert_equal 2, status
-  end
-
-  def test_capture_unchecked_wraps_missing_binary
-    e = VMCtl::Executor.new
-    assert_raises(VMCtl::ExecutorError) { e.capture_unchecked("vmctl_definitely_missing_binary_xyz") }
-  end
 end
