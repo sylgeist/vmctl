@@ -20,6 +20,7 @@ require_relative 'commands/destroy'
 require_relative 'commands/add_disk'
 require_relative 'commands/grow_disk'
 require_relative 'commands/remove_disk'
+require_relative 'commands/set'
 
 module VMCtl
   module CLI
@@ -41,6 +42,7 @@ module VMCtl
         add-disk <name> <spec>  Add a disk (suffix:size[:from img]) to an existing VM.
         grow-disk <name> <sfx> <size>  Grow a disk and update the inventory.
         remove-disk <name> <sfx> [--purge]  Remove a disk (optionally delete the file).
+        set <name> [opts]       Change VM fields (--autostart/--network/--mac/--config/--iso).
         list                  List configured VMs.
         help                  Show this message.
 
@@ -64,7 +66,8 @@ module VMCtl
       'destroy'  => Commands::Destroy,
       'add-disk'  => Commands::AddDisk,
       'grow-disk' => Commands::GrowDisk,
-      'remove-disk' => Commands::RemoveDisk
+      'remove-disk' => Commands::RemoveDisk,
+      'set'         => Commands::Set
     }.freeze
 
     def self.run(argv)
