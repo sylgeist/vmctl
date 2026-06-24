@@ -226,4 +226,26 @@ class TestConfig < Minitest::Test
     assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
     f.close
   end
+
+  def test_disk_parse_basic
+    d = VMCtl::Disk.parse('pod34', 'data:50G')
+    assert_equal 'pod34-data.raw', d.file
+    assert_equal '50G', d.size
+    assert_nil d.from
+  end
+
+  def test_disk_parse_with_from
+    d = VMCtl::Disk.parse('pod34', 'data:50G:from gold.raw')
+    assert_equal 'pod34-data.raw', d.file
+    assert_equal '50G', d.size
+    assert_equal 'gold.raw', d.from
+  end
+
+  def test_disk_parse_rejects_missing_size
+    assert_raises(ArgumentError) { VMCtl::Disk.parse('pod34', 'data') }
+  end
+
+  def test_disk_parse_rejects_empty_suffix
+    assert_raises(ArgumentError) { VMCtl::Disk.parse('pod34', ':50G') }
+  end
 end

@@ -16,7 +16,18 @@ module VMCtl
     :options,
     keyword_init: true
   )
-  Disk = Struct.new(:file, :size, :from, keyword_init: true)
+  Disk = Struct.new(:file, :size, :from, keyword_init: true) do
+    # spec grammar: "<suffix>:<size>[:from <image>]"
+    #   e.g. "zfs:100G" or "data:50G:from gold.raw"
+    def self.parse(name, spec)
+      body, from = spec.to_s.split(':from ', 2)
+      suffix, size = body.to_s.split(':', 2)
+      if suffix.to_s.empty? || size.to_s.empty?
+        raise ArgumentError, "invalid disk spec #{spec.inspect} (expected suffix:size)"
+      end
+      new(file: "#{name}-#{suffix}.raw", size: size, from: from)
+    end
+  end
 
   class Config
     DEFAULTS = {
