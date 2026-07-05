@@ -13,9 +13,10 @@ module VMCtl
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
-    :options,
+    :options, :mtu, :networks,
     keyword_init: true
   )
+  Nic = Struct.new(:bridge, :mtu, :mac, keyword_init: true)
   Disk = Struct.new(:file, :size, :from, keyword_init: true) do
     # spec grammar: "<suffix>:<size>[:from <image>]"
     #   e.g. "zfs:100G" or "data:50G:from gold.raw"
@@ -128,7 +129,9 @@ module VMCtl
         disks:      parse_disks(body.fetch('disks', [])),
         cloud_init: body['cloud_init'],
         iso:        body['iso'],
-        options:    parse_options(body.fetch('options', {}))
+        options:    parse_options(body.fetch('options', {})),
+        mtu:        body['mtu'],
+        networks:   parse_networks(body.fetch('networks', []))
       )
     end
 
@@ -152,6 +155,17 @@ module VMCtl
       h
     end
 
+    def parse_networks(list)
+      list ||= []
+      raise ConfigError, "'networks' must be a list" unless list.is_a?(Array)
+      list.map do |n|
+        raise ConfigError, "each network must be a mapping, got: #{n.inspect}" unless n.is_a?(Hash)
+        bridge = n['bridge']
+        raise ConfigError, "each network needs a 'bridge', got: #{n.inspect}" if bridge.to_s.empty?
+        Nic.new(bridge: bridge, mtu: n['mtu'], mac: n['mac'])
+      end
+    end
+
     def vm_to_h(vm)
       h = {
         'config'  => vm.config,
@@ -164,12 +178,21 @@ module VMCtl
       h['cloud_init'] = vm.cloud_init if vm.cloud_init
       h['iso'] = vm.iso if vm.iso
       h['options'] = vm.options unless vm.options.nil? || vm.options.empty?
+      h['mtu'] = vm.mtu unless vm.mtu.nil?
+      h['networks'] = vm.networks.map { |n| compact_nic(n) } unless vm.networks.nil? || vm.networks.empty?
       h
     end
 
     def compact_disk(d)
       h = { 'file' => d.file, 'size' => d.size }
       h['from'] = d.from if d.from
+      h
+    end
+
+    def compact_nic(n)
+      h = { 'bridge' => n.bridge }
+      h['mtu'] = n.mtu unless n.mtu.nil?
+      h['mac'] = n.mac unless n.mac.nil?
       h
     end
   end

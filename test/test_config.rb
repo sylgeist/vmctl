@@ -248,4 +248,66 @@ class TestConfig < Minitest::Test
   def test_disk_parse_rejects_empty_suffix
     assert_raises(ArgumentError) { VMCtl::Disk.parse('pod34', ':50G') }
   end
+
+  def test_networks_default_empty_and_mtu_nil
+    f = write_inventory(VALID_INVENTORY)
+    cfg = VMCtl::Config.load(f.path)
+    vm = cfg.vms.fetch('pod34')
+    assert_equal [], vm.networks
+    assert_nil vm.mtu
+    f.close
+  end
+
+  def test_networks_and_mtu_parse_and_roundtrip
+    inv = <<~YAML
+      defaults: { config_dir: /c, vm_root: /v, zpool: tank, link_base: 10 }
+      vms:
+        pod34:
+          network: labs_vlan50
+          link: 10
+          mtu: 1500
+          disks: []
+          networks:
+            - { bridge: storage_vlan60, mtu: 9000, mac: 5a:9c:fc:00:00:20 }
+            - { bridge: mgmt_vlan70 }
+    YAML
+    f = write_inventory(inv)
+    cfg = VMCtl::Config.load(f.path)
+    vm = cfg.vms.fetch('pod34')
+    assert_equal 1500, vm.mtu
+    assert_equal 2, vm.networks.length
+    assert_equal 'storage_vlan60', vm.networks[0].bridge
+    assert_equal 9000, vm.networks[0].mtu
+    assert_equal '5a:9c:fc:00:00:20', vm.networks[0].mac
+    assert_equal 'mgmt_vlan70', vm.networks[1].bridge
+    assert_nil vm.networks[1].mtu
+    assert_nil vm.networks[1].mac
+
+    out = Tempfile.new(['out', '.yml'])
+    cfg.save(out.path)
+    r = VMCtl::Config.load(out.path).vms.fetch('pod34')
+    assert_equal 1500, r.mtu
+    assert_equal %w[storage_vlan60 mgmt_vlan70], r.networks.map(&:bridge)
+    assert_equal 9000, r.networks[0].mtu
+    assert_nil r.networks[1].mtu
+    f.close; out.close
+  end
+
+  def test_networks_and_mtu_absent_not_emitted
+    f = write_inventory(VALID_INVENTORY)
+    cfg = VMCtl::Config.load(f.path)
+    out = Tempfile.new(['out', '.yml'])
+    cfg.save(out.path)
+    body = File.read(out.path)
+    refute_match(/networks:/, body)
+    refute_match(/mtu:/, body)
+    f.close; out.close
+  end
+
+  def test_networks_must_be_list_of_mappings_with_bridge
+    bad_type = "vms:\n  p:\n    network: n\n    link: 10\n    disks: []\n    networks: 5\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(bad_type).path) }
+    no_bridge = "vms:\n  p:\n    network: n\n    link: 10\n    disks: []\n    networks: [{ mtu: 9000 }]\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(no_bridge).path) }
+  end
 end
