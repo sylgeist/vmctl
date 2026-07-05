@@ -127,7 +127,7 @@ module VMCtl
         mac:        body['mac'],
         autostart:  body.fetch('autostart', false),
         disks:      parse_disks(body.fetch('disks', [])),
-        cloud_init: body['cloud_init'],
+        cloud_init: parse_cloud_init(body['cloud_init']),
         iso:        body['iso'],
         options:    parse_options(body.fetch('options', {})),
         mtu:        body['mtu'],
@@ -164,6 +164,17 @@ module VMCtl
         raise ConfigError, "each network needs a 'bridge', got: #{n.inspect}" if bridge.to_s.empty?
         Nic.new(bridge: bridge, mtu: n['mtu'], mac: n['mac'])
       end
+    end
+
+    def parse_cloud_init(ci)
+      return nil if ci.nil?
+      raise ConfigError, "'cloud_init' must be a mapping" unless ci.is_a?(Hash)
+      if ci['user_data'].to_s.empty?
+        raise ConfigError, "'cloud_init' needs a 'user_data' template"
+      end
+      vars = ci['vars']
+      raise ConfigError, "'cloud_init.vars' must be a mapping" unless vars.nil? || vars.is_a?(Hash)
+      ci
     end
 
     def vm_to_h(vm)

@@ -49,18 +49,12 @@ module VMCtl
         disk
       end
 
-      # A VM with iso: needs a template that consumes %(iso), and vice versa —
-      # otherwise bhyve sees an undefined config variable or an empty CD path.
-      def validate_iso_pairing!(vm)
-        if vm.entry.iso && !vm.template_wants_iso?
-          raise CommandError,
-                "template #{vm.entry.config} does not reference %(iso) (use an installer template)"
-        end
-        if !vm.entry.iso && vm.template_wants_iso?
-          raise CommandError,
-                "template #{vm.entry.config} references %(iso) but VM #{vm.name} has no iso"
-        end
+      # Resolve a cloud-init template path: absolute paths are used as-is;
+      # relative paths are joined to config_dir.
+      def cloud_init_template(t)
+        File.absolute_path?(t) ? t : File.join(config.defaults.config_dir, t)
       end
+
     end
   end
 end

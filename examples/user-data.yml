@@ -1,8 +1,9 @@
 #cloud-config
-# Minimal NoCloud user-data. vmctl copies this file VERBATIM into the seed ISO
-# (it only generates the companion meta-data: instance-id + local-hostname).
-# Pass it with:  vmctl create web1 --config pod-cloudinit.conf \
-#                  --network labs_vlan50 --cloud-init examples/user-data.yml
+# Minimal NoCloud user-data. vmctl renders this template (with vars from the
+# inventory `cloud_init.vars:` block) into the seed ISO alongside generated
+# meta-data (instance-id + local-hostname).
+# Pass it with:  vmctl create web1 --network labs_vlan50 \
+#                  --cloud-init examples/user-data.yml
 
 users:
   - name: admin

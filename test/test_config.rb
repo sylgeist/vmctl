@@ -310,4 +310,32 @@ class TestConfig < Minitest::Test
     no_bridge = "vms:\n  p:\n    network: n\n    link: 10\n    disks: []\n    networks: [{ mtu: 9000 }]\n"
     assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(no_bridge).path) }
   end
+
+  def test_cloud_init_parses_user_data_and_vars
+    inv = <<~YAML
+      defaults: { config_dir: /c, vm_root: /v, zpool: tank, link_base: 10 }
+      vms:
+        pod34:
+          network: n
+          link: 10
+          disks: []
+          cloud_init:
+            user_data: web-base.yml
+            vars: { role: web }
+    YAML
+    cfg = VMCtl::Config.load(write_inventory(inv).path)
+    ci = cfg.vms.fetch('pod34').cloud_init
+    assert_equal 'web-base.yml', ci['user_data']
+    assert_equal({ 'role' => 'web' }, ci['vars'])
+  end
+
+  def test_cloud_init_requires_user_data
+    inv = "vms:\n  p:\n    network: n\n    link: 10\n    disks: []\n    cloud_init: { vars: {} }\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv).path) }
+  end
+
+  def test_cloud_init_vars_must_be_mapping
+    inv = "vms:\n  p:\n    network: n\n    link: 10\n    disks: []\n    cloud_init: { user_data: u, vars: 5 }\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv).path) }
+  end
 end

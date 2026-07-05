@@ -25,7 +25,7 @@ module VMCtl
         validate!(vm, entry, opts, provisioner)
 
         provision(vm, entry, provisioner)
-        cloud_init(vm, entry, opts[:cloud_init]) if opts[:cloud_init]
+        cloud_init(vm, entry, opts[:cloud_init], opts[:vars]) if opts[:cloud_init]
 
         config.add_vm(entry)
         config.save(config.path) unless executor.dry_run?
@@ -37,7 +37,7 @@ module VMCtl
       private
 
       def parse(args)
-        o = { disks: [] }
+        o = { disks: [], vars: {} }
         parser = OptionParser.new do |p|
           p.on('--network NET') { |v| o[:network] = v }
           p.on('--config TMPL') { |v| o[:config] = v }
@@ -46,6 +46,7 @@ module VMCtl
           p.on('--root-from IMG')  { |v| o[:root_from] = v }
           p.on('--disk SPEC')   { |v| o[:disks] << v }
           p.on('--cloud-init FILE') { |v| o[:cloud_init] = v }
+          p.on('--var KV') { |v| k, val = v.split('=', 2); raise CommandError, "invalid --var #{v.inspect}" unless k =~ /\A\w+\z/ && val; o[:vars][k] = val }
           p.on('--iso FILE')    { |v| o[:iso] = v }
           p.on('--autostart')   { o[:autostart] = true }
           p.on('--start')       { o[:start] = true }
@@ -95,7 +96,6 @@ module VMCtl
         if entry.iso && !File.exist?(entry.iso)
           raise CommandError, "iso not found: #{entry.iso}"
         end
-        validate_iso_pairing!(vm)
         raise CommandError, "dataset dir already exists: #{vm.dir}" if File.exist?(vm.dir)
         entry.disks.each do |disk|
           begin
@@ -110,8 +110,8 @@ module VMCtl
             raise CommandError, "disk #{disk.file} size #{disk.size} is smaller than image #{disk.from}"
           end
         end
-        if opts[:cloud_init] && !File.exist?(opts[:cloud_init])
-          raise CommandError, "cloud-init file not found: #{opts[:cloud_init]}"
+        if opts[:cloud_init] && !File.exist?(cloud_init_template(opts[:cloud_init]))
+          raise CommandError, "cloud-init template not found: #{cloud_init_template(opts[:cloud_init])}"
         end
       end
 
@@ -130,12 +130,12 @@ module VMCtl
         vm.nic_bridges.each { |b| ng.ensure_bridge!(b) }
       end
 
-      def cloud_init(vm, entry, user_data)
-        CloudInit.new(executor).build_seed(vm, user_data)
-        dest = File.join(vm.dir, "#{vm.name}-user-data.yml")
-        executor.run('cp', user_data, dest)
-        entry.cloud_init = { 'user_data' => "#{vm.name}-user-data.yml" }
+      def cloud_init(vm, entry, template, vars)
+        CloudInit.new(executor).build_seed(vm, cloud_init_template(template), vars)
+        entry.cloud_init = { 'user_data' => template }
+        entry.cloud_init['vars'] = vars unless vars.empty?
       end
+
     end
   end
 end

@@ -71,14 +71,6 @@ class TestSetCommand < Minitest::Test
     assert_match(/template not found/, err.message)
   end
 
-  def test_set_iso_requires_pairing
-    # pod.conf has no %(iso); setting an iso on it must fail pairing.
-    iso = File.join(@dir, 'x.iso'); File.write(iso, 'i')
-    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
-    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--iso', iso]) }
-    assert_match(/does not reference/, err.message)
-  end
-
   def test_set_iso_with_installer_template
     iso = File.join(@dir, 'x.iso'); File.write(iso, 'i')
     cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
@@ -141,5 +133,38 @@ class TestSetCommand < Minitest::Test
     cmd = VMCtl::Commands::Set.new(config: cfg, executor: exec)
     capture_stdout { cmd.call(['pod34', '--network', 'none']) }
     assert_equal 'none', VMCtl::Config.load(@inv).vms.fetch('pod34').network
+  end
+
+  def test_set_cloud_init_builds_seed_and_records
+    File.write(File.join(@dir, 'base.yml'), "#cloud-config\nhostname: %(name)\n")
+    exec = stopped
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: exec)
+    capture_stdout { cmd.call(['pod34', '--cloud-init', 'base.yml']) }
+    ci = VMCtl::Config.load(@inv).vms.fetch('pod34').cloud_init
+    assert_equal 'base.yml', ci['user_data']
+    assert(exec.runs.any? { |a| a.first == 'makefs' })
+  end
+
+  def test_set_var_updates_and_rebuilds
+    File.write(File.join(@dir, 'base.yml'), "role: %(role)\n")
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--cloud-init', 'base.yml', '--var', 'role=web']) }
+    ci = VMCtl::Config.load(@inv).vms.fetch('pod34').cloud_init
+    assert_equal({ 'role' => 'web' }, ci['vars'])
+  end
+
+  def test_set_no_cloud_init_clears
+    File.write(File.join(@dir, 'base.yml'), "x: 1\n")
+    VMCtl::Commands::Set.new(config: cfg, executor: stopped).tap do |c|
+      capture_stdout { c.call(['pod34', '--cloud-init', 'base.yml']) }
+      capture_stdout { c.call(['pod34', '--no-cloud-init']) }
+    end
+    assert_nil VMCtl::Config.load(@inv).vms.fetch('pod34').cloud_init
+  end
+
+  def test_set_cloud_init_rejects_missing_template
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--cloud-init', 'nope.yml']) }
+    assert_match(/cloud-init template not found/, err.message)
   end
 end

@@ -31,12 +31,13 @@ vms:
       - { file: pod34-root.raw, size: 20G, from: base-14.raw }  # cloned from the golden image
       - { file: pod34-zfs.raw,  size: 100G }                    # blank second disk
 
-  # A cloud-init VM (root only). Its template carries an AHCI-CD device that
-  # points at the generated seed ISO. Create it with:
-  #   vmctl create web1 --config pod-cloudinit.conf --network labs_vlan50 \
-  #         --mac generate --cloud-init examples/user-data.yml
+  # A cloud-init VM (root only). vmctl generates the NoCloud seed ISO
+  # (pci.0.6.0) from `cloud_init:` — no special template needed; pod.conf works.
+  # Create it with:
+  #   vmctl create web1 --network labs_vlan50 --mac generate \
+  #         --cloud-init web-base.yml --start
   web1:
-    config: pod-cloudinit.conf
+    config: pod.conf
     network: labs_vlan50
     link: 11
     mac: 5a:9c:fc:00:00:11     # a pinned, locally-administered MAC (stable across moves)
@@ -44,4 +45,19 @@ vms:
     disks:
       - { file: web1-root.raw, size: 20G, from: base-14.raw }
     cloud_init:
-      user_data: web1-user-data.yml   # vmctl packs this verbatim into web1-seed.iso
+      user_data: web-base.yml   # a template in config_dir; vmctl renders + packs into seed.iso
+      vars:
+        role: web
+
+  # An installer-ISO VM. vmctl attaches the ISO at pci.0.5.0 — no %(iso) in the
+  # template; pod.conf works for this too.
+  #   vmctl create install1 --network labs_vlan50 --iso /bhyve/isos/freebsd-14.3.iso --start
+  # install1:
+  #   config: pod.conf
+  #   network: labs_vlan50
+  #   link: 12
+  #   mac: null
+  #   autostart: false
+  #   iso: /bhyve/isos/freebsd-14.3.iso
+  #   disks:
+  #     - { file: install1-root.raw, size: 20G }
