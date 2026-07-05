@@ -29,7 +29,10 @@ module VMCtl
         end
         raise CommandError, "#{vm.name} already running" if vm.running?(executor)
         validate_iso_pairing!(vm)
-        @netgraph.ensure_bridge!(vm.entry.network)
+        if vm.nic_count > 8
+          raise CommandError, "#{vm.name} has #{vm.nic_count} NICs (max 8: pci.0.4.0-7)"
+        end
+        vm.nic_bridges.each { |b| @netgraph.ensure_bridge!(b) }
         vm.write_config
         sup = @factory.call(vm)
         pid = sup.start

@@ -227,6 +227,50 @@ class TestStartCommand < Minitest::Test
     err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod36']) }
     assert_match(/references %\(iso\)/, err.message)
   end
+
+  def config_with_networks(networks_yaml)
+    inv = <<~YAML
+      defaults:
+        config_dir: #{config_dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: #{run_dir}
+        log_dir: #{run_dir}
+      vms:
+        pod34:
+          config: pod.conf
+          network: labs_vlan50
+          link: 10
+          disks: [{ file: pod34-root.raw, size: 20G }]
+          networks:
+      #{networks_yaml}
+    YAML
+    f = Tempfile.new(['inv', '.yml']); f.write(inv); f.flush
+    VMCtl::Config.load(f.path)
+  end
+
+  def test_start_validates_every_nic_bridge
+    cfg = config_with_networks("        - { bridge: storage_vlan60 }\n")
+    exec = FakeExecutor.new(probes: {
+      '/dev/vmm/pod34' => false,
+      'ngctl info labs_vlan50:' => true,
+      'ngctl info storage_vlan60:' => false  # second bridge missing
+    })
+    cmd = VMCtl::Commands::Start.new(config: cfg, executor: exec,
+                                     supervisor_factory: ->(_vm, **) { flunk 'must not start' })
+    assert_raises(VMCtl::NetgraphError) { cmd.call(['pod34']) }
+  end
+
+  def test_start_rejects_more_than_eight_nics
+    nets = (1..8).map { |i| "        - { bridge: b#{i} }" }.join("\n") + "\n"
+    cfg = config_with_networks(nets)   # 1 primary + 8 = 9
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false })
+    cmd = VMCtl::Commands::Start.new(config: cfg, executor: exec,
+                                     supervisor_factory: ->(_vm, **) { flunk 'must not start' })
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
+    assert_match(/max 8/, err.message)
+  end
 end
 
 class TestStopCommand < Minitest::Test

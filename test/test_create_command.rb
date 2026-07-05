@@ -220,4 +220,14 @@ class TestCreateCommand < Minitest::Test
     end
     assert_match(/references %\(iso\)/, err.message)
   end
+
+  def test_create_network_none_skips_bridge_and_succeeds
+    # If create wrongly probed a 'none' bridge, this false probe would make it
+    # raise; success proves the primary-bridge check is skipped for `none`.
+    exec = FakeExecutor.new(probes: { 'ngctl info none:' => false })
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod37', '--network', 'none']) }
+    entry = VMCtl::Config.load(@inv).vms.fetch('pod37')
+    assert_equal 'none', entry.network
+  end
 end
