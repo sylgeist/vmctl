@@ -136,9 +136,6 @@ module VMCtl
         entry.cloud_init['vars'] = vars unless vars.empty?
       end
 
-      def cloud_init_template(t)
-        File.absolute_path?(t) ? t : File.join(config.defaults.config_dir, t)
-      end
     end
   end
 end

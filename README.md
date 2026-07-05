@@ -149,6 +149,21 @@ NOT declare `pci.0.4.*`. Per-VM MTU defaults to 9000; `mac: generate` produces
 a deterministic per-interface address. Manage NICs with `vmctl add-nic` /
 `remove-nic`, and the primary with `vmctl set --network|--mac|--mtu`.
 
+## Cloud-init / upgrade notes
+
+- **Template resolution** — `cloud_init.user_data` names a template in `config_dir`
+  (e.g. `web-base.yml`) or an absolute path. It is a shared source rendered at
+  every start, not a per-VM copy. Pass `--cloud-init web-base.yml` (no directory
+  prefix); vmctl joins it to `config_dir` automatically.
+- **Variable substitution** — `%(name)`, `%(network)`, `%(link)`, `%(mac)`, and
+  any keys added with `--var KEY=VAL` are substituted in the user-data template.
+  An unknown `%(word)` token passes through unchanged, so `%(...)` syntax is
+  effectively reserved for vmctl variables.
+- **Migrating older VMs** — if a VM's `config:` pointed at the removed
+  `pod-installer.conf` or `pod-cloudinit.conf` flavors, switch it to `pod.conf`.
+  CD-ROM device lines are now generated automatically from the inventory; they
+  must not appear in the template.
+
 ## Tests
 
 ```sh

@@ -35,7 +35,7 @@ vms:
   # (pci.0.6.0) from `cloud_init:` — no special template needed; pod.conf works.
   # Create it with:
   #   vmctl create web1 --network labs_vlan50 --mac generate \
-  #         --cloud-init configs/web-base.yml --start
+  #         --cloud-init web-base.yml --start
   web1:
     config: pod.conf
     network: labs_vlan50

@@ -49,6 +49,12 @@ module VMCtl
         disk
       end
 
+      # Resolve a cloud-init template path: absolute paths are used as-is;
+      # relative paths are joined to config_dir.
+      def cloud_init_template(t)
+        File.absolute_path?(t) ? t : File.join(config.defaults.config_dir, t)
+      end
+
     end
   end
 end

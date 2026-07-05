@@ -116,9 +116,6 @@ module VMCtl
         changed << "cloud_init=#{ci['user_data']}"
       end
 
-      def cloud_init_template(t)
-        File.absolute_path?(t) ? t : File.join(config.defaults.config_dir, t)
-      end
     end
   end
 end
