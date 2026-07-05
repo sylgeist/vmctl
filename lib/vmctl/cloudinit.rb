@@ -25,7 +25,7 @@ module VMCtl
       iso = File.join(vm.dir, "#{vm.name}-seed.iso")
       Dir.mktmpdir('vmctl-seed') do |seeddir|
         populate_seed(seeddir, vm, user_data_path)
-        @exec.run("makefs -t cd9660 -o rockridge,label=cidata #{iso} #{seeddir}")
+        @exec.run('makefs', '-t', 'cd9660', '-o', 'rockridge,label=cidata', iso, seeddir)
       end
       iso
     end

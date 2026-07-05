@@ -13,23 +13,23 @@ module VMCtl
     end
 
     def create_dataset(vm)
-      @exec.run("zfs create #{@defaults.zpool}/#{vm.name}")
+      @exec.run('zfs', 'create', "#{@defaults.zpool}/#{vm.name}")
     end
 
     # Grow an existing raw disk in place. Caller validates new > current.
     def grow_disk(path, size)
-      @exec.run("truncate -s #{size} #{path}")
+      @exec.run('truncate', '-s', size, path)
     end
 
     # path: absolute target raw file. size: human size string. from: bare image
     # name (resolved via image_dir) or nil for a blank sparse file.
     def create_disk(path, size, from: nil)
       if from.nil?
-        @exec.run("truncate -s #{size} #{path}")
+        @exec.run('truncate', '-s', size, path)
         return
       end
       image = image_path(from)
-      @exec.run("cp #{image} #{path}")
+      @exec.run('cp', image, path)
       grow_if_needed(path, size, image)
     end
 
@@ -43,7 +43,7 @@ module VMCtl
 
     def grow_if_needed(path, size, image)
       return unless Sizes.parse(size) > File.size(image)
-      @exec.run("truncate -s #{size} #{path}")
+      @exec.run('truncate', '-s', size, path)
     end
   end
 end

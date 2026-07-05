@@ -16,38 +16,35 @@ module VMCtl
       @dry_run
     end
 
-    # Mutating command. No-op (logs only) in dry-run.
-    def run(cmd)
+    # Mutating command. No-op (logs only) in dry-run. argv = separate arguments
+    # (never a shell string) so nothing is word-split or shell-interpreted.
+    def run(*argv)
       if @dry_run
-        VMCtl.logger.info("[dry-run] #{cmd}")
+        VMCtl.logger.info("[dry-run] #{argv.join(' ')}")
         return ""
       end
-      capture(cmd)
+      capture(*argv)
     end
 
     # Read-only query. Always executes. Raises on failure.
-    def capture(cmd)
-      VMCtl.logger.debug("exec: #{cmd}")
-      # Intentional: commands are pre-built strings; callers own injection safety.
-      stdout, stderr, status = Open3.capture3(cmd)
+    def capture(*argv)
+      VMCtl.logger.debug("exec: #{argv.join(' ')}")
+      stdout, stderr, status = Open3.capture3(*argv)
       unless status.success?
         raise ExecutorError,
-              "#{cmd.split.first} exited with status #{status.exitstatus}: #{stderr.strip}"
+              "#{argv.first} exited with status #{status.exitstatus}: #{stderr.strip}"
       end
       stdout
     rescue Errno::ENOENT
-      # A no-metacharacter command string is exec'd directly (no shell), so a
-      # missing binary surfaces as ENOENT — report it as an ExecutorError.
-      raise ExecutorError, "command not found: #{cmd.split.first}"
+      raise ExecutorError, "command not found: #{argv.first}"
     end
 
     # Probe: true/false by exit status, never raises.
-    def success?(cmd)
-      VMCtl.logger.debug("probe: #{cmd}")
-      _out, _err, status = Open3.capture3(cmd)
+    def success?(*argv)
+      VMCtl.logger.debug("probe: #{argv.join(' ')}")
+      _out, _err, status = Open3.capture3(*argv)
       status.success?
     rescue SystemCallError
-      # Missing binary / unrunnable command counts as "not successful".
       false
     end
   end

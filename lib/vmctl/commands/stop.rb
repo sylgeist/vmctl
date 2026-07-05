@@ -24,7 +24,7 @@ module VMCtl
         pid = vm.read_pid
         unless pid
           puts "#{vm.name} not running (no pidfile)"
-          executor.run("bhyvectl --destroy --vm=#{vm.name}") if force
+          executor.run('bhyvectl', '--destroy', "--vm=#{vm.name}") if force
           return
         end
 
@@ -35,7 +35,7 @@ module VMCtl
 
         if force
           safe_kill('KILL', pid)
-          executor.run("bhyvectl --destroy --vm=#{vm.name}")
+          executor.run('bhyvectl', '--destroy', "--vm=#{vm.name}")
           puts "force-stopped #{vm.name}"
         else
           safe_kill('TERM', pid)

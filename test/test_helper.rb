@@ -6,20 +6,19 @@ require 'vmctl/log'
 # Keep test output pristine; tests assert on behavior, not log lines.
 VMCtl.log_level = Logger::FATAL
 
-# Records mutating commands, answers queries/probes from canned data.
-# Use in every test that touches a shell-out boundary.
+# Records mutating commands as argv arrays; answers queries/probes from canned
+# data keyed by a substring of the joined command. Use in every test that
+# touches a shell-out boundary.
 class FakeExecutor
   attr_reader :runs, :captures
 
-  # captures: Hash of command-substring => stdout to return from #capture/#run/#capture_unchecked
+  # captures: Hash of command-substring => stdout to return from #capture/#run
   # probes:   Hash of command-substring => boolean to return from #success?
-  # errs:     Hash of command-substring => stderr to return from #capture_unchecked
-  def initialize(captures: {}, probes: {}, errs: {}, dry_run: false)
+  def initialize(captures: {}, probes: {}, dry_run: false)
     @runs = []
     @captures = []
     @canned = captures
     @probes = probes
-    @errs = errs
     @dry_run = dry_run
   end
 
@@ -27,37 +26,25 @@ class FakeExecutor
     @dry_run
   end
 
-  def run(cmd)
-    @runs << cmd
-    canned_for(cmd) || ""
+  def run(*argv)
+    @runs << argv
+    canned_for(argv) || ""
   end
 
-  def capture(cmd)
-    @captures << cmd
-    canned_for(cmd) || ""
+  def capture(*argv)
+    @captures << argv
+    canned_for(argv) || ""
   end
 
-  def success?(cmd)
-    match = @probes.find { |k, _| cmd.include?(k) }
+  def success?(*argv)
+    match = @probes.find { |k, _| argv.join(' ').include?(k) }
     match ? match[1] : true
-  end
-
-  # Returns [stdout, stderr, exitstatus]; status is a non-zero stand-in to model
-  # commands (like bhyve config.dump) that exit non-zero by design.
-  def capture_unchecked(cmd)
-    @captures << cmd
-    [canned_for(cmd) || "", err_for(cmd) || "", 1]
   end
 
   private
 
-  def canned_for(cmd)
-    match = @canned.find { |k, _| cmd.include?(k) }
-    match&.last
-  end
-
-  def err_for(cmd)
-    match = @errs.find { |k, _| cmd.include?(k) }
+  def canned_for(argv)
+    match = @canned.find { |k, _| argv.join(' ').include?(k) }
     match&.last
   end
 end
