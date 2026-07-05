@@ -79,6 +79,20 @@ module VMCtl
       @entry.disks.map { |d| File.join(dir, d.file) }
     end
 
+    # Bridges that must exist for this VM (primary unless `none`/nil, plus each
+    # additional NIC). Used for start/create validation.
+    def nic_bridges
+      bridges = []
+      bridges << @entry.network unless @entry.network.nil? || @entry.network == 'none'
+      (@entry.networks || []).each { |n| bridges << n.bridge }
+      bridges
+    end
+
+    def nic_count
+      primary = (@entry.network.nil? || @entry.network == 'none') ? 0 : 1
+      primary + (@entry.networks || []).length
+    end
+
     def running?(executor)
       executor.success?("test -e #{vmm_device}")
     end

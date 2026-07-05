@@ -15,6 +15,7 @@ module VMCtl
           p.on('--autostart')    { opts[:autostart] = true }
           p.on('--no-autostart') { opts[:autostart] = false }
           p.on('--network NET')  { |v| opts[:network] = v }
+          p.on('--mtu N')        { |v| opts[:mtu] = v }
           p.on('--mac MAC')      { |v| opts[:mac] = v }
           p.on('--config TMPL')  { |v| opts[:config] = v }
           p.on('--iso FILE')     { |v| opts[:iso] = v }
@@ -41,9 +42,13 @@ module VMCtl
           changed << "autostart=#{e.autostart}"
         end
         if opts.key?(:network)
-          Netgraph.new(executor).ensure_bridge!(opts[:network])
+          Netgraph.new(executor).ensure_bridge!(opts[:network]) unless opts[:network] == 'none'
           e.network = opts[:network]
           changed << "network=#{e.network}"
+        end
+        if opts.key?(:mtu)
+          e.mtu = parse_mtu(opts[:mtu])
+          changed << "mtu=#{e.mtu}"
         end
         if opts.key?(:mac)
           e.mac = resolve_mac(opts[:mac], vm.name)
@@ -56,6 +61,12 @@ module VMCtl
         end
         apply_iso!(vm, opts[:iso], changed) if opts.key?(:iso)
         changed
+      end
+
+      def parse_mtu(v)
+        n = Integer(v, exception: false)
+        raise CommandError, "invalid --mtu #{v.inspect}" if n.nil? || n <= 0
+        n
       end
 
       def resolve_mac(mac, name)

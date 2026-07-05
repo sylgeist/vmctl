@@ -115,4 +115,31 @@ class TestSetCommand < Minitest::Test
     out = capture_stdout { cmd.call(['pod34', '--autostart']) }
     assert_match(/next start/, out)
   end
+
+  def test_set_mtu
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--mtu', '1500']) }
+    assert_equal 1500, VMCtl::Config.load(@inv).vms.fetch('pod34').mtu
+  end
+
+  def test_set_bad_mtu
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--mtu', 'huge']) }
+  end
+
+  def test_set_network_none_skips_bridge
+    # No ngctl probe should be needed; default probes would answer true anyway,
+    # so assert the value was set and no bridge lookup gates it.
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--network', 'none']) }
+    assert_equal 'none', VMCtl::Config.load(@inv).vms.fetch('pod34').network
+  end
+
+  def test_set_network_none_when_bridge_absent
+    # Even if every bridge is missing, --network none must succeed.
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false, 'ngctl info' => false })
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: exec)
+    capture_stdout { cmd.call(['pod34', '--network', 'none']) }
+    assert_equal 'none', VMCtl::Config.load(@inv).vms.fetch('pod34').network
+  end
 end

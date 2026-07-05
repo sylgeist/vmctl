@@ -15,12 +15,12 @@ class TestVM < Minitest::Test
     )
   end
 
-  def entry(mac: nil, iso: nil, config: 'pod.conf')
+  def entry(mac: nil, iso: nil, config: 'pod.conf', network: 'labs_vlan50', networks: [])
     VMCtl::VMEntry.new(
-      name: 'pod34', config: config, network: 'labs_vlan50', link: 10,
+      name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true,
       disks: [VMCtl::Disk.new(file: 'pod34-root.raw', size: '20G', from: nil)],
-      cloud_init: nil, iso: iso
+      cloud_init: nil, iso: iso, networks: networks
     )
   end
 
@@ -110,5 +110,25 @@ class TestVM < Minitest::Test
   def test_template_wants_iso_false_when_template_missing
     vm = VMCtl::VM.new(entry(config: 'nope.conf'), defaults)
     refute vm.template_wants_iso?
+  end
+
+  def test_nic_bridges_and_count_primary_only
+    vm = VMCtl::VM.new(entry, defaults)
+    assert_equal ['labs_vlan50'], vm.nic_bridges
+    assert_equal 1, vm.nic_count
+  end
+
+  def test_nic_bridges_and_count_with_networks
+    nets = [VMCtl::Nic.new(bridge: 'b1', mtu: nil, mac: nil),
+            VMCtl::Nic.new(bridge: 'b2', mtu: nil, mac: nil)]
+    vm = VMCtl::VM.new(entry(networks: nets), defaults)
+    assert_equal %w[labs_vlan50 b1 b2], vm.nic_bridges
+    assert_equal 3, vm.nic_count
+  end
+
+  def test_nic_bridges_and_count_network_none
+    vm = VMCtl::VM.new(entry(network: 'none'), defaults)
+    assert_equal [], vm.nic_bridges
+    assert_equal 0, vm.nic_count
   end
 end

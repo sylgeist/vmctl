@@ -15,6 +15,10 @@ class TestAllocator < Minitest::Test
     VMCtl::Config.new(raw)
   end
 
+  def empty_config
+    VMCtl::Config.new('vms' => {})
+  end
+
   def test_first_link_is_link_base_when_empty
     alloc = VMCtl::Allocator.new(config_with([]))
     assert_equal 10, alloc.next_link
@@ -55,5 +59,18 @@ class TestAllocator < Minitest::Test
     assert_equal 0b10, first_octet & 0b11, "must be locally-administered unicast"
     assert_equal mac, alloc.generate_mac('pod34'), "must be deterministic"
     refute_equal mac, alloc.generate_mac('pod35')
+  end
+
+  def test_generate_mac_index_zero_unchanged
+    alloc = VMCtl::Allocator.new(empty_config)
+    assert_equal alloc.generate_mac('pod34'), alloc.generate_mac('pod34', 0)
+  end
+
+  def test_generate_mac_index_differs_and_valid
+    alloc = VMCtl::Allocator.new(empty_config)
+    m0 = alloc.generate_mac('pod34', 0)
+    m1 = alloc.generate_mac('pod34', 1)
+    refute_equal m0, m1
+    assert_match(/\A5a:9c:fc(:[0-9a-f]{2}){3}\z/, m1)
   end
 end

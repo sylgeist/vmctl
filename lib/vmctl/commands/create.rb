@@ -90,7 +90,7 @@ module VMCtl
       end
 
       def validate!(vm, entry, opts, provisioner)
-        Netgraph.new(executor).ensure_bridge!(entry.network)
+        validate_nics!(vm)
         raise CommandError, "template not found: #{vm.template_path}" unless File.exist?(vm.template_path)
         if entry.iso && !File.exist?(entry.iso)
           raise CommandError, "iso not found: #{entry.iso}"
@@ -120,6 +120,14 @@ module VMCtl
         entry.disks.each do |disk|
           provisioner.create_disk(File.join(vm.dir, disk.file), disk.size, from: disk.from)
         end
+      end
+
+      def validate_nics!(vm)
+        if vm.nic_count > 8
+          raise CommandError, "#{vm.name} has #{vm.nic_count} NICs (max 8: pci.0.4.0-7)"
+        end
+        ng = Netgraph.new(executor)
+        vm.nic_bridges.each { |b| ng.ensure_bridge!(b) }
       end
 
       def cloud_init(vm, entry, user_data)

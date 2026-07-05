@@ -30,7 +30,7 @@ module VMCtl
     # the net block / iso CD / cloud-init seed to generated wiring later, append a
     # generator here -- no other change is required.
     def generators
-      [method(:disk_keys)]
+      [method(:disk_keys), method(:net_keys)]
     end
 
     def disk_keys(vm)
@@ -40,6 +40,38 @@ module VMCtl
         keys["pci.0.3.#{n}.path"]   = File.join(vm.dir, disk.file)
       end
       keys
+    end
+
+    def net_keys(vm)
+      nics = nic_list(vm)
+      keys = {}
+      nics.each_with_index do |nic, f|
+        p = "pci.0.4.#{f}"
+        keys["#{p}.device"]   = 'virtio-net'
+        keys["#{p}.backend"]  = 'netgraph'
+        keys["#{p}.path"]     = "#{nic[:bridge]}:"
+        keys["#{p}.peerhook"] = nic[:peerhook]
+        keys["#{p}.socket"]   = nic[:socket]
+        keys["#{p}.mtu"]      = (nic[:mtu] || 9000).to_s
+        keys["#{p}.mac"]      = nic[:mac] if nic[:mac]
+      end
+      keys
+    end
+
+    # Ordered NIC specs: primary (unless none/nil) then each additional NIC,
+    # with role-based peerhook/socket names.
+    def nic_list(vm)
+      e = vm.entry
+      list = []
+      unless e.network.nil? || e.network == 'none'
+        list << { bridge: e.network, mtu: e.mtu, mac: e.mac,
+                  peerhook: "link#{e.link}", socket: "bhyve_#{vm.name}" }
+      end
+      (e.networks || []).each_with_index do |n, j|
+        list << { bridge: n.bridge, mtu: n.mtu, mac: n.mac,
+                  peerhook: "link#{e.link}_#{j + 1}", socket: "bhyve_#{vm.name}_#{j + 1}" }
+      end
+      list
     end
 
     def substitute(text, entry)

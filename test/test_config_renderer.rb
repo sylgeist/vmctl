@@ -15,11 +15,12 @@ class TestConfigRenderer < Minitest::Test
     )
   end
 
-  def entry(disks:, mac: nil, iso: nil, options: {}, config: 'base.conf')
+  def entry(disks:, mac: nil, iso: nil, options: {}, config: 'base.conf',
+            network: 'labs_vlan50', mtu: nil, networks: [])
     VMCtl::VMEntry.new(
-      name: 'pod34', config: config, network: 'labs_vlan50', link: 10,
+      name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true, disks: disks, cloud_init: nil, iso: iso,
-      options: options
+      options: options, mtu: mtu, networks: networks
     )
   end
 
@@ -83,7 +84,7 @@ class TestConfigRenderer < Minitest::Test
   end
 
   def test_output_is_sorted
-    out = render("zeta=1\nalpha=2\n", entry(disks: []))
+    out = render("zeta=1\nalpha=2\n", entry(disks: [], network: 'none'))
     assert_equal %w[alpha=2 zeta=1], out.split("\n")
   end
 
@@ -98,5 +99,55 @@ class TestConfigRenderer < Minitest::Test
     body << "cpus=2\n"
     out = render(body, entry(disks: []))
     assert_match(/^cpus=2$/, out)
+  end
+
+  def test_primary_nic_matches_legacy_keys
+    out = render("cpus=2\n", entry(disks: []))
+    assert_match(/^pci\.0\.4\.0\.device=virtio-net$/, out)
+    assert_match(/^pci\.0\.4\.0\.backend=netgraph$/, out)
+    assert_match(/^pci\.0\.4\.0\.path=labs_vlan50:$/, out)
+    assert_match(/^pci\.0\.4\.0\.peerhook=link10$/, out)
+    assert_match(/^pci\.0\.4\.0\.socket=bhyve_pod34$/, out)
+    assert_match(/^pci\.0\.4\.0\.mtu=9000$/, out)
+    refute_match(/^pci\.0\.4\.0\.mac=/, out)   # no mac when unset
+  end
+
+  def test_primary_mac_and_mtu_override
+    out = render("cpus=2\n", entry(disks: [], mac: '5a:9c:fc:00:00:11', mtu: 1500))
+    assert_match(/^pci\.0\.4\.0\.mac=5a:9c:fc:00:00:11$/, out)
+    assert_match(/^pci\.0\.4\.0\.mtu=1500$/, out)
+  end
+
+  def test_additional_nics_get_sequential_functions_and_roles
+    nets = [VMCtl::Nic.new(bridge: 'storage_vlan60', mtu: nil, mac: nil),
+            VMCtl::Nic.new(bridge: 'mgmt_vlan70', mtu: 1500, mac: '5a:9c:fc:00:00:21')]
+    out = render("cpus=2\n", entry(disks: [], networks: nets))
+    # nic 1
+    assert_match(/^pci\.0\.4\.1\.path=storage_vlan60:$/, out)
+    assert_match(/^pci\.0\.4\.1\.peerhook=link10_1$/, out)
+    assert_match(/^pci\.0\.4\.1\.socket=bhyve_pod34_1$/, out)
+    assert_match(/^pci\.0\.4\.1\.mtu=9000$/, out)
+    refute_match(/^pci\.0\.4\.1\.mac=/, out)
+    # nic 2
+    assert_match(/^pci\.0\.4\.2\.path=mgmt_vlan70:$/, out)
+    assert_match(/^pci\.0\.4\.2\.peerhook=link10_2$/, out)
+    assert_match(/^pci\.0\.4\.2\.socket=bhyve_pod34_2$/, out)
+    assert_match(/^pci\.0\.4\.2\.mtu=1500$/, out)
+    assert_match(/^pci\.0\.4\.2\.mac=5a:9c:fc:00:00:21$/, out)
+  end
+
+  def test_network_none_omits_primary_and_shifts_functions
+    nets = [VMCtl::Nic.new(bridge: 'storage_vlan60', mtu: nil, mac: nil)]
+    out = render("cpus=2\n", entry(disks: [], network: 'none', networks: nets))
+    # the sole additional NIC takes function 0 (no gap), keeps its role-based name
+    assert_match(/^pci\.0\.4\.0\.path=storage_vlan60:$/, out)
+    assert_match(/^pci\.0\.4\.0\.peerhook=link10_1$/, out)
+    assert_match(/^pci\.0\.4\.0\.socket=bhyve_pod34_1$/, out)
+    refute_match(/^pci\.0\.4\.1\./, out)
+  end
+
+  def test_network_none_no_networks_has_no_nics
+    out = render("cpus=2\n", entry(disks: [], network: 'none'))
+    refute_match(/^pci\.0\.4\./, out)
   end
 end
