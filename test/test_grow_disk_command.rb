@@ -36,7 +36,7 @@ class TestGrowDiskCommand < Minitest::Test
     exec = stopped
     cmd = VMCtl::Commands::GrowDisk.new(config: cfg, executor: exec)
     capture_stdout { cmd.call(['pod34', 'data', '100G']) }
-    assert_includes exec.runs, "truncate -s 100G #{File.join(@vm_root, 'pod34', 'pod34-data.raw')}"
+    assert_includes exec.runs, ['truncate', '-s', '100G', File.join(@vm_root, 'pod34', 'pod34-data.raw')]
     entry = VMCtl::Config.load(@inv).vms.fetch('pod34')
     assert_equal '100G', entry.disks.find { |d| d.file == 'pod34-data.raw' }.size
   end

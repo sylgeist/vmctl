@@ -48,8 +48,8 @@ class TestCreateCommand < Minitest::Test
     exec = bridge_ok
     cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
     capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50']) }
-    assert_includes exec.runs, 'zfs create tank/bhyve/pod35'
-    assert(exec.runs.any? { |c| c.include?('cp ') && c.include?('pod35-root.raw') })
+    assert_includes exec.runs, ['zfs', 'create', 'tank/bhyve/pod35']
+    assert(exec.runs.any? { |a| a.first == 'cp' && a.any? { |x| x.include?('pod35-root.raw') } })
     reloaded = VMCtl::Config.load(@inv)
     entry = reloaded.vms.fetch('pod35')
     assert_equal 'labs_vlan50', entry.network
@@ -85,7 +85,7 @@ class TestCreateCommand < Minitest::Test
     files = entry.disks.map(&:file)
     assert_includes files, 'pod35-root.raw'
     assert_includes files, 'pod35-zfs.raw'
-    assert(exec.runs.any? { |c| c == 'truncate -s 5M ' + File.join(@vm_root, 'pod35', 'pod35-zfs.raw') })
+    assert_includes exec.runs, ['truncate', '-s', '5M', File.join(@vm_root, 'pod35', 'pod35-zfs.raw')]
   end
 
   def test_create_mac_generate
@@ -101,7 +101,7 @@ class TestCreateCommand < Minitest::Test
     exec = bridge_ok
     cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
     capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--cloud-init', ud]) }
-    assert(exec.runs.any? { |c| c.start_with?('makefs ') })
+    assert(exec.runs.any? { |a| a.first == 'makefs' })
     entry = VMCtl::Config.load(@inv).vms.fetch('pod35')
     assert_equal 'pod35-user-data.yml', entry.cloud_init['user_data']
   end

@@ -38,7 +38,7 @@ class TestRemoveDiskCommand < Minitest::Test
     out = capture_stdout { cmd.call(['pod34', 'data']) }
     entry = VMCtl::Config.load(@inv).vms.fetch('pod34')
     assert_equal %w[pod34-root.raw], entry.disks.map(&:file)
-    refute(exec.runs.any? { |c| c.start_with?('rm ') })
+    refute(exec.runs.any? { |a| a.first == 'rm' })
     assert_match(/left in place/, out)
   end
 
@@ -46,7 +46,7 @@ class TestRemoveDiskCommand < Minitest::Test
     exec = stopped
     cmd = VMCtl::Commands::RemoveDisk.new(config: cfg, executor: exec)
     capture_stdout { cmd.call(['pod34', 'data', '--purge']) }
-    assert_includes exec.runs, "rm -f #{File.join(@vm_root, 'pod34', 'pod34-data.raw')}"
+    assert_includes exec.runs, ['rm', '-f', File.join(@vm_root, 'pod34', 'pod34-data.raw')]
   end
 
   def test_remove_disk_refuses_root

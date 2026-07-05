@@ -35,7 +35,7 @@ class TestSupervisor < Minitest::Test
     sup = VMCtl::Supervisor.new(build_vm, executor: exec, runner: runner)
     sup.supervise
     assert_equal 3, runs, "bhyve launched 3 times"
-    destroys = exec.runs.select { |c| c.include?('bhyvectl --destroy') }
+    destroys = exec.runs.select { |a| a.first == 'bhyvectl' && a[1] == '--destroy' }
     assert_equal 3, destroys.length, "destroy runs once per bhyve exit"
   end
 
@@ -44,7 +44,7 @@ class TestSupervisor < Minitest::Test
     runner = -> { 1 }
     sup = VMCtl::Supervisor.new(build_vm, executor: exec, runner: runner)
     sup.supervise
-    assert_equal 1, exec.runs.count { |c| c.include?('bhyvectl --destroy --vm=pod34') }
+    assert_equal 1, exec.runs.count { |a| a == ['bhyvectl', '--destroy', '--vm=pod34'] }
   end
 
   def test_loop_stops_when_poweroff_requested_during_run
@@ -59,6 +59,6 @@ class TestSupervisor < Minitest::Test
     sup = VMCtl::Supervisor.new(build_vm, executor: exec, runner: runner)
     sup.supervise
     assert_equal 1, calls, "must not relaunch after poweroff requested"
-    assert_equal 1, exec.runs.count { |c| c.include?('bhyvectl --destroy') }
+    assert_equal 1, exec.runs.count { |a| a.first == 'bhyvectl' && a[1] == '--destroy' }
   end
 end

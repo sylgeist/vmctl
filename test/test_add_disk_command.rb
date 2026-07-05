@@ -41,7 +41,7 @@ class TestAddDiskCommand < Minitest::Test
     exec = stopped
     cmd = VMCtl::Commands::AddDisk.new(config: cfg, executor: exec)
     capture_stdout { cmd.call(['pod34', 'data:50G']) }
-    assert_includes exec.runs, "truncate -s 50G #{File.join(@vm_root, 'pod34', 'pod34-data.raw')}"
+    assert_includes exec.runs, ['truncate', '-s', '50G', File.join(@vm_root, 'pod34', 'pod34-data.raw')]
     entry = VMCtl::Config.load(@inv).vms.fetch('pod34')
     assert_equal %w[pod34-root.raw pod34-data.raw], entry.disks.map(&:file)
   end
@@ -50,7 +50,7 @@ class TestAddDiskCommand < Minitest::Test
     exec = stopped
     cmd = VMCtl::Commands::AddDisk.new(config: cfg, executor: exec)
     capture_stdout { cmd.call(['pod34', 'data:50G:from gold.raw']) }
-    assert(exec.runs.any? { |c| c.include?('cp ') && c.include?('gold.raw') })
+    assert(exec.runs.any? { |a| a.first == 'cp' && a.any? { |x| x.include?('gold.raw') } })
   end
 
   def test_add_disk_rejects_duplicate_suffix
