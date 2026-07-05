@@ -4,6 +4,7 @@ require 'optparse'
 require_relative 'base'
 require_relative '../netgraph'
 require_relative '../allocator'
+require_relative '../cloudinit'
 
 module VMCtl
   module Commands
@@ -20,6 +21,9 @@ module VMCtl
           p.on('--config TMPL')  { |v| opts[:config] = v }
           p.on('--iso FILE')     { |v| opts[:iso] = v }
           p.on('--no-iso')       { opts[:iso] = false }
+          p.on('--cloud-init TMPL') { |v| opts[:cloud_init] = v }
+          p.on('--no-cloud-init')   { opts[:cloud_init] = false }
+          p.on('--var KV')          { |v| (opts[:vars] ||= {}); k, val = v.split('=', 2); raise CommandError, "invalid --var #{v.inspect}" unless k =~ /\A\w+\z/ && val; opts[:vars][k] = val }
         end
         rest = parser.parse(args)
         name = rest.shift
@@ -60,6 +64,7 @@ module VMCtl
           changed << "config=#{e.config}"
         end
         apply_iso!(vm, opts[:iso], changed) if opts.key?(:iso)
+        apply_cloud_init!(vm, opts, changed) if opts.key?(:cloud_init) || opts.key?(:vars)
         changed
       end
 
@@ -90,6 +95,29 @@ module VMCtl
           e.iso = path
           changed << "iso=#{path}"
         end
+      end
+
+      def apply_cloud_init!(vm, opts, changed)
+        e = vm.entry
+        if opts[:cloud_init] == false
+          e.cloud_init = nil
+          changed << 'cloud_init=(none)'
+          return
+        end
+        ci = e.cloud_init ? e.cloud_init.dup : {}
+        ci['user_data'] = opts[:cloud_init] if opts[:cloud_init]
+        raise CommandError, 'set --var requires cloud-init on the VM' if ci['user_data'].to_s.empty?
+        vars = (ci['vars'] || {}).merge(opts[:vars] || {})
+        template = cloud_init_template(ci['user_data'])
+        raise CommandError, "cloud-init template not found: #{template}" unless File.exist?(template)
+        CloudInit.new(executor).build_seed(vm, template, vars)
+        ci['vars'] = vars unless vars.empty?
+        e.cloud_init = ci
+        changed << "cloud_init=#{ci['user_data']}"
+      end
+
+      def cloud_init_template(t)
+        File.absolute_path?(t) ? t : File.join(config.defaults.config_dir, t)
       end
     end
   end
