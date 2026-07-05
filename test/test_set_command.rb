@@ -71,14 +71,6 @@ class TestSetCommand < Minitest::Test
     assert_match(/template not found/, err.message)
   end
 
-  def test_set_iso_requires_pairing
-    # pod.conf has no %(iso); setting an iso on it must fail pairing.
-    iso = File.join(@dir, 'x.iso'); File.write(iso, 'i')
-    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
-    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--iso', iso]) }
-    assert_match(/does not reference/, err.message)
-  end
-
   def test_set_iso_with_installer_template
     iso = File.join(@dir, 'x.iso'); File.write(iso, 'i')
     cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)

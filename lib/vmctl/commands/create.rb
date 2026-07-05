@@ -95,7 +95,6 @@ module VMCtl
         if entry.iso && !File.exist?(entry.iso)
           raise CommandError, "iso not found: #{entry.iso}"
         end
-        validate_iso_pairing!(vm)
         raise CommandError, "dataset dir already exists: #{vm.dir}" if File.exist?(vm.dir)
         entry.disks.each do |disk|
           begin

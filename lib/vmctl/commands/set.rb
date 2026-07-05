@@ -89,7 +89,6 @@ module VMCtl
           raise CommandError, "iso not found: #{path}" unless File.exist?(path)
           e.iso = path
           changed << "iso=#{path}"
-          validate_iso_pairing!(vm)
         end
       end
     end

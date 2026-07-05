@@ -28,7 +28,6 @@ module VMCtl
           return
         end
         raise CommandError, "#{vm.name} already running" if vm.running?(executor)
-        validate_iso_pairing!(vm)
         if vm.nic_count > 8
           raise CommandError, "#{vm.name} has #{vm.nic_count} NICs (max 8: pci.0.4.0-7)"
         end

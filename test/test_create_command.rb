@@ -202,25 +202,6 @@ class TestCreateCommand < Minitest::Test
     assert_match(/iso not found/, err.message)
   end
 
-  def test_create_rejects_iso_when_template_lacks_reference
-    iso = write_iso
-    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
-    err = assert_raises(VMCtl::Commands::CommandError) do
-      # default template pod.conf has no %(iso)
-      cmd.call(['pod36', '--network', 'labs_vlan50', '--iso', iso])
-    end
-    assert_match(/does not reference/, err.message)
-  end
-
-  def test_create_rejects_installer_template_without_iso
-    write_installer_template
-    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
-    err = assert_raises(VMCtl::Commands::CommandError) do
-      cmd.call(['pod36', '--network', 'labs_vlan50', '--config', 'installer.conf'])
-    end
-    assert_match(/references %\(iso\)/, err.message)
-  end
-
   def test_create_network_none_skips_bridge_and_succeeds
     # If create wrongly probed a 'none' bridge, this false probe would make it
     # raise; success proves the primary-bridge check is skipped for `none`.
