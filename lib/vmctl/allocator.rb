@@ -28,9 +28,12 @@ module VMCtl
       @config.vms.key?(name)
     end
 
-    # Deterministic per-name MAC in the locally-administered range.
-    def generate_mac(name)
-      digest = Digest::SHA256.hexdigest(name)
+    # Deterministic per-(name, index) MAC in the locally-administered range.
+    # index 0 is the VM's primary NIC (unchanged); nonzero indexes are additional
+    # NICs, seeded distinctly so a VM's NICs never share a generated MAC.
+    def generate_mac(name, index = 0)
+      seed = index.zero? ? name : "#{name}:nic#{index}"
+      digest = Digest::SHA256.hexdigest(seed)
       tail = [digest[0, 2], digest[2, 2], digest[4, 2]].map { |h| h.to_i(16) }
       (OUI + tail).map { |b| format('%02x', b) }.join(':')
     end
