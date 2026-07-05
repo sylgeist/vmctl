@@ -95,17 +95,19 @@ else `ConfigError`. `vm_to_h` continues to emit `cloud_init` only when set.
 
 `CloudInit#build_seed(vm, template_path, vars)` now **renders** rather than copies:
 
-1. Read the template file text.
-2. `rendered = VMCtl.substitute(text, builtins(vm).merge(stringify(vars)))` —
-   built-ins `{name, network, link, mac}` from the entry; operator `vars` win on
-   key collision.
-3. Write `meta-data` (unchanged: `instance-id`/`local-hostname = name`) and the
-   rendered user-data into the seed dir; `makefs` → `<vm.dir>/<name>-seed.iso`.
-4. Also write the rendered user-data to `<vm.dir>/<name>-user-data.yml` for
-   inspection (derived artifact).
+1. `render_user_data(vm, text, vars)` — a **public, pure** method:
+   `VMCtl.substitute(text, builtins(vm).merge(stringify(vars)))`, built-ins
+   `{name, network, link, mac}`; operator `vars` win on key collision. This is
+   the observable/testable seam (no side effects).
+2. `build_seed` reads the template, calls `render_user_data`, writes `meta-data`
+   (unchanged: `instance-id`/`local-hostname = name`) + the rendered user-data
+   into an ephemeral seed dir, and `makefs` → `<vm.dir>/<name>-seed.iso`.
 
-`meta_data_for` is unchanged. Template resolution: absolute path used as-is, else
-`File.join(defaults.config_dir, user_data)`.
+No rendered copy is written to `<vm.dir>` (keeps `build_seed` free of a `vm.dir`
+write, which the create/set command tests can't provide — the dataset dir must
+not pre-exist for `create`). Inspect rendered output via `render_user_data` or by
+mounting the seed. `meta_data_for` is unchanged. Template resolution: absolute
+path used as-is, else `File.join(defaults.config_dir, user_data)`.
 
 ### Seed lifecycle
 
