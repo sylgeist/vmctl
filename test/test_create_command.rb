@@ -96,14 +96,32 @@ class TestCreateCommand < Minitest::Test
     assert_match(/\A([0-9a-f]{2}:){5}[0-9a-f]{2}\z/, entry.mac)
   end
 
-  def test_create_cloud_init_records_field_and_builds_seed
-    ud = File.join(@dir, 'ud.yml'); File.write(ud, "#cloud-config\n")
+  def test_create_cloud_init_builds_seed_and_records_template
+    File.write(File.join(@config_dir, 'web-base.yml'), "#cloud-config\nhostname: %(name)\n")
     exec = bridge_ok
     cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
-    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--cloud-init', ud]) }
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--cloud-init', 'web-base.yml']) }
     assert(exec.runs.any? { |a| a.first == 'makefs' })
-    entry = VMCtl::Config.load(@inv).vms.fetch('pod35')
-    assert_equal 'pod35-user-data.yml', entry.cloud_init['user_data']
+    ci = VMCtl::Config.load(@inv).vms.fetch('pod35').cloud_init
+    assert_equal 'web-base.yml', ci['user_data']
+    refute ci.key?('vars')
+  end
+
+  def test_create_cloud_init_with_vars
+    File.write(File.join(@config_dir, 'web-base.yml'), "#cloud-config\nrole: %(role)\n")
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--cloud-init', 'web-base.yml', '--var', 'role=web']) }
+    ci = VMCtl::Config.load(@inv).vms.fetch('pod35').cloud_init
+    assert_equal({ 'role' => 'web' }, ci['vars'])
+  end
+
+  def test_create_rejects_missing_cloud_init_template
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    err = assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--cloud-init', 'nope.yml'])
+    end
+    assert_match(/cloud-init template not found/, err.message)
   end
 
   def test_dry_run_writes_nothing
