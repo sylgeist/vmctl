@@ -45,6 +45,7 @@ module VMCtl
       _out, _err, status = Open3.capture3(*argv)
       status.success?
     rescue SystemCallError
+      # Missing binary / unrunnable command counts as "not successful".
       false
     end
   end
