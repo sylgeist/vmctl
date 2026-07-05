@@ -15,11 +15,11 @@ class TestConfigRenderer < Minitest::Test
     )
   end
 
-  def entry(disks:, mac: nil, iso: nil, options: {}, config: 'base.conf',
+  def entry(disks:, mac: nil, iso: nil, cloud_init: nil, options: {}, config: 'base.conf',
             network: 'labs_vlan50', mtu: nil, networks: [])
     VMCtl::VMEntry.new(
       name: 'pod34', config: config, network: network, link: 10,
-      mac: mac, autostart: true, disks: disks, cloud_init: nil, iso: iso,
+      mac: mac, autostart: true, disks: disks, cloud_init: cloud_init, iso: iso,
       options: options, mtu: mtu, networks: networks
     )
   end
@@ -149,5 +149,37 @@ class TestConfigRenderer < Minitest::Test
   def test_network_none_no_networks_has_no_nics
     out = render("cpus=2\n", entry(disks: [], network: 'none'))
     refute_match(/^pci\.0\.4\./, out)
+  end
+
+  def test_iso_cd_generated_when_iso_set
+    out = render("cpus=2\n", entry(disks: [], iso: '/bhyve/isos/x.iso'))
+    assert_match(/^pci\.0\.5\.0\.device=ahci$/, out)
+    assert_match(/^pci\.0\.5\.0\.port\.0\.type=cd$/, out)
+    assert_match(/^pci\.0\.5\.0\.port\.0\.ro=true$/, out)
+    assert_match(%r{^pci\.0\.5\.0\.port\.0\.path=/bhyve/isos/x\.iso$}, out)
+  end
+
+  def test_no_iso_cd_when_absent
+    out = render("cpus=2\n", entry(disks: []))
+    refute_match(/pci\.0\.5\./, out)
+  end
+
+  def test_seed_cd_generated_when_cloud_init_set
+    out = render("cpus=2\n", entry(disks: [], cloud_init: { 'user_data' => 'x.yml' }))
+    assert_match(/^pci\.0\.6\.0\.device=ahci$/, out)
+    assert_match(/^pci\.0\.6\.0\.port\.0\.type=cd$/, out)
+    assert_match(%r{^pci\.0\.6\.0\.port\.0\.path=/bhyve/pod34/pod34-seed\.iso$}, out)
+    refute_match(/^pci\.0\.6\.0\.port\.0\.ro=/, out)   # seed CD is read-write
+  end
+
+  def test_no_seed_cd_when_absent
+    out = render("cpus=2\n", entry(disks: []))
+    refute_match(/pci\.0\.6\./, out)
+  end
+
+  def test_iso_and_seed_cds_coexist
+    out = render("cpus=2\n", entry(disks: [], iso: '/i.iso', cloud_init: { 'user_data' => 'x.yml' }))
+    assert_match(/^pci\.0\.5\.0\.device=ahci$/, out)
+    assert_match(/^pci\.0\.6\.0\.device=ahci$/, out)
   end
 end

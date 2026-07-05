@@ -32,7 +32,7 @@ module VMCtl
     # the net block / iso CD / cloud-init seed to generated wiring later, append a
     # generator here -- no other change is required.
     def generators
-      [method(:disk_keys), method(:net_keys)]
+      [method(:disk_keys), method(:net_keys), method(:iso_cd_keys), method(:seed_cd_keys)]
     end
 
     def disk_keys(vm)
@@ -58,6 +58,27 @@ module VMCtl
         keys["#{p}.mac"]      = nic[:mac] if nic[:mac]
       end
       keys
+    end
+
+    # Installer ISO CD (read-only), generated when the VM has an iso:.
+    def iso_cd_keys(vm)
+      return {} unless vm.entry.iso
+      {
+        'pci.0.5.0.device'      => 'ahci',
+        'pci.0.5.0.port.0.type' => 'cd',
+        'pci.0.5.0.port.0.ro'   => 'true',
+        'pci.0.5.0.port.0.path' => vm.entry.iso
+      }
+    end
+
+    # NoCloud cloud-init seed CD, generated when the VM has cloud_init:.
+    def seed_cd_keys(vm)
+      return {} unless vm.entry.cloud_init
+      {
+        'pci.0.6.0.device'      => 'ahci',
+        'pci.0.6.0.port.0.type' => 'cd',
+        'pci.0.6.0.port.0.path' => File.join(vm.dir, "#{vm.name}-seed.iso")
+      }
     end
 
     # Ordered NIC specs: primary (unless none/nil) then each additional NIC,
