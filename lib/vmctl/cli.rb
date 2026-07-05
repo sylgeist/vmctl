@@ -21,6 +21,7 @@ require_relative 'commands/add_disk'
 require_relative 'commands/grow_disk'
 require_relative 'commands/remove_disk'
 require_relative 'commands/set'
+require_relative 'commands/add_nic'
 
 module VMCtl
   module CLI
@@ -43,6 +44,7 @@ module VMCtl
         grow-disk <name> <sfx> <size>  Grow a disk and update the inventory.
         remove-disk <name> <sfx> [--purge]  Remove a disk (optionally delete the file).
         set <name> [opts]       Change VM fields (--autostart/--network/--mac/--config/--iso).
+        add-nic <name> <bridge>  Add a network interface (--mtu N, --mac generate|ADDR).
         list                  List configured VMs.
         help                  Show this message.
 
@@ -67,7 +69,8 @@ module VMCtl
       'add-disk'  => Commands::AddDisk,
       'grow-disk' => Commands::GrowDisk,
       'remove-disk' => Commands::RemoveDisk,
-      'set'         => Commands::Set
+      'set'         => Commands::Set,
+      'add-nic'     => Commands::AddNic
     }.freeze
 
     def self.run(argv)
