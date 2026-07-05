@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 # lib/vmctl/config_renderer.rb
+require_relative 'substitution'
+
 module VMCtl
   # Renders a VM's fully-resolved bhyve config from its base flavor file plus the
   # inventory entry. Pure: text/data in, config text out (no file writing).
@@ -75,14 +77,12 @@ module VMCtl
     end
 
     def substitute(text, entry)
-      vars = {
-        'name'    => entry.name.to_s,
-        'network' => entry.network.to_s,
-        'link'    => entry.link.to_s,
-        'mac'     => entry.mac.to_s,
-        'iso'     => entry.iso.to_s
-      }
-      text.gsub(/%\((\w+)\)/) { vars.fetch(Regexp.last_match(1), Regexp.last_match(0)) }
+      VMCtl.substitute(text,
+                       'name'    => entry.name.to_s,
+                       'network' => entry.network.to_s,
+                       'link'    => entry.link.to_s,
+                       'mac'     => entry.mac.to_s,
+                       'iso'     => entry.iso.to_s)
     end
 
     def parse_pairs(text)
