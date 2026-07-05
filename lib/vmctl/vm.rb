@@ -94,7 +94,7 @@ module VMCtl
     end
 
     def running?(executor)
-      executor.success?("test -e #{vmm_device}")
+      executor.success?('test', '-e', vmm_device)
     end
 
     def read_pid

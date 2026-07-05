@@ -31,7 +31,7 @@ module VMCtl
       private
 
       def purge_file(vm, disk)
-        executor.run("rm -f #{File.join(vm.dir, disk.file)}")
+        executor.run('rm', '-f', File.join(vm.dir, disk.file))
         'and purged its file'
       end
     end

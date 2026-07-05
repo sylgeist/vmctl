@@ -133,7 +133,7 @@ module VMCtl
       def cloud_init(vm, entry, user_data)
         CloudInit.new(executor).build_seed(vm, user_data)
         dest = File.join(vm.dir, "#{vm.name}-user-data.yml")
-        executor.run("cp #{user_data} #{dest}")
+        executor.run('cp', user_data, dest)
         entry.cloud_init = { 'user_data' => "#{vm.name}-user-data.yml" }
       end
     end

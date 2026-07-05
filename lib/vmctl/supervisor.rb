@@ -27,7 +27,7 @@ module VMCtl
       loop do
         break if @poweroff_requested # a stop requested between runs must not relaunch
         status = @runner.call
-        @exec.run("bhyvectl --destroy --vm=#{@vm.name}")
+        @exec.run('bhyvectl', '--destroy', "--vm=#{@vm.name}")
         break if @poweroff_requested
         break unless self.class.reboot?(status)
       end
@@ -72,7 +72,7 @@ module VMCtl
     def install_signal_handlers
       Signal.trap('TERM') do
         request_poweroff
-        @exec.run("bhyvectl --force-poweroff --vm=#{@vm.name}") if @bhyve_pid
+        @exec.run('bhyvectl', '--force-poweroff', "--vm=#{@vm.name}") if @bhyve_pid
       end
     end
 

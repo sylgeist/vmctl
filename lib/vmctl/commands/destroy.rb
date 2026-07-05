@@ -15,7 +15,7 @@ module VMCtl
 
         confirm!(name) unless opts[:yes]
 
-        executor.run("zfs destroy #{config.defaults.zpool}/#{name}") if opts[:purge]
+        executor.run('zfs', 'destroy', "#{config.defaults.zpool}/#{name}") if opts[:purge]
         config.remove_vm(name)
         config.save(config.path) unless executor.dry_run?
         puts "destroyed #{name}#{opts[:purge] ? ' (dataset purged)' : ''}"

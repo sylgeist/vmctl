@@ -11,7 +11,7 @@ module VMCtl
     end
 
     def bridge_exists?(name)
-      @exec.success?("ngctl info #{name}:")
+      @exec.success?('ngctl', 'info', "#{name}:")
     end
 
     def ensure_bridge!(name)

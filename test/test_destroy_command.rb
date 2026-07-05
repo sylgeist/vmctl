@@ -36,14 +36,14 @@ class TestDestroyCommand < Minitest::Test
     cmd = VMCtl::Commands::Destroy.new(config: load_config, executor: exec)
     capture_stdout { cmd.call(['pod35', '--yes']) }
     refute VMCtl::Config.load(@inv).vms.key?('pod35')
-    refute(exec.runs.any? { |c| c.start_with?('zfs destroy') }, 'no purge without --purge')
+    refute(exec.runs.any? { |a| a.first == 'zfs' && a[1] == 'destroy' }, 'no purge without --purge')
   end
 
   def test_destroy_purge_runs_zfs_destroy
     exec = stopped_exec
     cmd = VMCtl::Commands::Destroy.new(config: load_config, executor: exec)
     capture_stdout { cmd.call(['pod35', '--purge', '--yes']) }
-    assert_includes exec.runs, 'zfs destroy tank/bhyve/pod35'
+    assert_includes exec.runs, ['zfs', 'destroy', 'tank/bhyve/pod35']
   end
 
   def test_destroy_refuses_running_vm

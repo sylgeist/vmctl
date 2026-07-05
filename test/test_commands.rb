@@ -288,7 +288,7 @@ class TestStopCommand < Minitest::Test
     exec = FakeExecutor.new
     cmd = VMCtl::Commands::Stop.new(config: load_config, executor: exec)
     capture_stdout { cmd.call(['--force', 'pod34']) }
-    assert_includes exec.runs, 'bhyvectl --destroy --vm=pod34'
+    assert_includes exec.runs, ['bhyvectl', '--destroy', '--vm=pod34']
   end
 
   def test_stop_rejects_unknown_flag
