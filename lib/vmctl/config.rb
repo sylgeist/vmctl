@@ -9,12 +9,12 @@ module VMCtl
 
   Defaults = Struct.new(
     :config_dir, :vm_root, :zpool, :template, :link_base, :run_dir, :log_dir,
-    :image_dir, :root_size, :root_from, :cpus, :memory,
+    :image_dir, :root_size, :root_from, :cpus, :memory, :vnc_base, :vnc_bind,
     keyword_init: true
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
-    :options, :mtu, :networks, :cpus, :memory,
+    :options, :mtu, :networks, :cpus, :memory, :graphics,
     keyword_init: true
   )
   Nic = Struct.new(:bridge, :mtu, :mac, keyword_init: true)
@@ -44,7 +44,9 @@ module VMCtl
       'root_size'  => '20G',
       'root_from'  => nil,
       'cpus'       => 1,
-      'memory'     => '1G'
+      'memory'     => '1G',
+      'vnc_base'   => 5900,
+      'vnc_bind'   => '0.0.0.0'
     }.freeze
 
     attr_reader :defaults, :vms, :path
@@ -115,7 +117,9 @@ module VMCtl
         root_size:  merged['root_size'],
         root_from:  merged['root_from'],
         cpus:       parse_cpus(merged['cpus']),
-        memory:     parse_memory(merged['memory'])
+        memory:     parse_memory(merged['memory']),
+        vnc_base:   parse_vnc_base(merged['vnc_base']),
+        vnc_bind:   merged['vnc_bind']
       )
     end
 
@@ -142,7 +146,8 @@ module VMCtl
         mtu:        body['mtu'],
         networks:   parse_networks(body.fetch('networks', [])),
         cpus:       parse_cpus(body['cpus']),
-        memory:     parse_memory(body['memory'])
+        memory:     parse_memory(body['memory']),
+        graphics:   body.fetch('graphics', false)
       )
     end
 
@@ -150,6 +155,12 @@ module VMCtl
       Integer(value)
     rescue ArgumentError, TypeError
       raise ConfigError, "'link_base' must be an integer, got: #{value.inspect}"
+    end
+
+    def parse_vnc_base(value)
+      Integer(value)
+    rescue ArgumentError, TypeError
+      raise ConfigError, "'vnc_base' must be an integer, got: #{value.inspect}"
     end
 
     def parse_disks(list)
@@ -217,6 +228,7 @@ module VMCtl
       h['options'] = vm.options unless vm.options.nil? || vm.options.empty?
       h['cpus'] = vm.cpus unless vm.cpus.nil?
       h['memory'] = vm.memory unless vm.memory.nil?
+      h['graphics'] = true if vm.graphics
       h['mtu'] = vm.mtu unless vm.mtu.nil?
       h['networks'] = vm.networks.map { |n| compact_nic(n) } unless vm.networks.nil? || vm.networks.empty?
       h

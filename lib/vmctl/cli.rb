@@ -44,7 +44,7 @@ module VMCtl
         add-disk <name> <spec>  Add a disk (suffix:size[:from img]) to an existing VM.
         grow-disk <name> <sfx> <size>  Grow a disk and update the inventory.
         remove-disk <name> <sfx> [--purge]  Remove a disk (optionally delete the file).
-        set <name> [opts]       Change VM fields (--autostart/--network[ none]/--mac/--mtu/--cpus/--memory/--config/--iso/--cloud-init/--var/--no-cloud-init).
+        set <name> [opts]       Change VM fields (--autostart/--network[ none]/--mac/--mtu/--cpus/--memory/--graphics/--config/--iso/--cloud-init/--var/--no-cloud-init).
         add-nic <name> <bridge>  Add a network interface (--mtu N, --mac generate|ADDR).
         remove-nic <name> <index>  Remove an additional NIC (1-based networks: index).
         list                  List configured VMs.

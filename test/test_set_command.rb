@@ -189,4 +189,26 @@ class TestSetCommand < Minitest::Test
     cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
     assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--memory', '1GB']) }
   end
+
+  def test_set_graphics
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--graphics']) }
+    assert_equal true, VMCtl::Config.load(@inv).vms.fetch('pod34').graphics
+  end
+
+  def test_set_no_graphics
+    File.write(@inv, <<~YAML)
+      defaults: { config_dir: #{@dir}, vm_root: /bhyve, zpool: tank, link_base: 10 }
+      vms:
+        pod34:
+          config: pod.conf
+          network: labs_vlan50
+          link: 10
+          graphics: true
+          disks: [{ file: pod34-root.raw, size: 20G }]
+    YAML
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--no-graphics']) }
+    assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod34').graphics
+  end
 end

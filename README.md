@@ -124,9 +124,22 @@ requirement:
 - **Cloud-init seed ISO** (`pci.0.6.0`) — generated when `cloud_init:` is present;
   vmctl builds a NoCloud ISO (label "cidata") from the `user_data:` template and
   optional `vars:`.
+- **Graphics console** (`pci.0.7.0`, `pci.0.8.0`) — generated when `graphics: true`
+  is set on a VM: a bhyve `fbuf` VNC console plus an `xhci`+`tablet` USB pointer,
+  giving a complete graphical console. Default is `false`. The VNC port is
+  `vnc_base + link` (`defaults.vnc_base`, default `5900`, so `link: 10` →
+  `5910`); the socket binds to `defaults.vnc_bind` (default `0.0.0.0` —
+  reachable from any host that can route to the bhyve host). `vmctl status`
+  prints the VNC endpoint (e.g. `vnc 0.0.0.0:5910`) for graphics-enabled VMs.
+  **Security caveat:** bhyve's VNC console is unauthenticated — anyone who can
+  reach the port gets the console with no password. To restrict access, set
+  `defaults.vnc_bind: 127.0.0.1` and reach it over an SSH tunnel instead:
+  `ssh -L 5910:localhost:5910 <host>`, then point a VNC client at
+  `localhost:5910`.
 
 Templates must NOT declare `cpus`, `memory.size`, `pci.0.3.*`, `pci.0.4.*`,
-`pci.0.5.*`, or `pci.0.6.*` — vmctl injects them all at start. At `start`,
+`pci.0.5.*`, `pci.0.6.*`, or (when `graphics: true`) `pci.0.7.*`/`pci.0.8.*` —
+vmctl injects them all at start. At `start`,
 vmctl renders the fully-resolved config to `<run_dir>/<name>.conf` (ephemeral,
 regenerated every start — do not hand-edit) and launches
 `bhyve -k <run_dir>/<name>.conf <name>`. Per-VM `options:` in the inventory

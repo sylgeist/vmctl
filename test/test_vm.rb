@@ -12,7 +12,7 @@ class TestVM < Minitest::Test
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'pod.conf', link_base: 10,
       run_dir: run_dir, log_dir: '/var/log/vmctl',
-      cpus: 1, memory: '1G'
+      cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0'
     )
   end
 
@@ -140,5 +140,15 @@ class TestVM < Minitest::Test
       exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false })
       refute vm.stale?(exec)
     end
+  end
+
+  def test_vnc_port_is_base_plus_link
+    vm = VMCtl::VM.new(entry, defaults)   # link 10
+    assert_equal 5910, vm.vnc_port
+  end
+
+  def test_vnc_endpoint_combines_bind_and_port
+    vm = VMCtl::VM.new(entry, defaults)
+    assert_equal '0.0.0.0:5910', vm.vnc_endpoint
   end
 end

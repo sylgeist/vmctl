@@ -17,6 +17,8 @@ defaults:
   root_from: base-14.raw       # default golden image for root (set null for a blank disk)
   cpus: 1                      # default vCPU count; per-VM override with `cpus:`
   memory: 1G                   # default memory (Sizes format: 1G/512M); per-VM override with `memory:`
+  vnc_base: 5900               # VNC port = vnc_base + link, for VMs with `graphics: true`
+  vnc_bind: 0.0.0.0            # VNC bind address; 0.0.0.0 is reachable from any routable host
 
 vms:
   # A two-disk VM (root + a separate data disk), started at host boot.
@@ -31,6 +33,8 @@ vms:
     autostart: true            # started by `vmctl start --all` (the rc.d shim) at boot
     cpus: 2                    # per-VM override of defaults.cpus
     memory: 4G                 # per-VM override of defaults.memory
+    # graphics: true           # attach a VNC console (fbuf) + USB tablet;
+    #                          # reachable at <vnc_bind>:<vnc_base + link> (0.0.0.0:5910)
     disks:
       - { file: pod34-root.raw, size: 20G, from: base-14.raw }  # cloned from the golden image
       - { file: pod34-zfs.raw,  size: 100G }                    # blank second disk

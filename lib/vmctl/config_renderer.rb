@@ -33,7 +33,7 @@ module VMCtl
     # generator here -- no other change is required.
     def generators
       [method(:disk_keys), method(:net_keys), method(:iso_cd_keys),
-       method(:seed_cd_keys), method(:hardware_keys)]
+       method(:seed_cd_keys), method(:hardware_keys), method(:graphics_keys)]
     end
 
     # CPU/memory from the inventory (entry, falling back to defaults).
@@ -41,6 +41,21 @@ module VMCtl
       {
         'cpus'        => (vm.entry.cpus   || @defaults.cpus).to_s,
         'memory.size' => (vm.entry.memory || @defaults.memory).to_s
+      }
+    end
+
+    # VNC framebuffer + USB tablet pointer, generated when graphics: true.
+    # Port derives from the VM's (unique) link; bind address is a host default.
+    def graphics_keys(vm)
+      return {} unless vm.entry.graphics
+      {
+        'pci.0.7.0.device'        => 'fbuf',
+        'pci.0.7.0.tcp'           => vm.vnc_endpoint,
+        'pci.0.7.0.w'             => '1024',
+        'pci.0.7.0.h'             => '768',
+        'pci.0.7.0.wait'          => 'false',
+        'pci.0.8.0.device'        => 'xhci',
+        'pci.0.8.0.slot.1.device' => 'tablet'
       }
     end
 

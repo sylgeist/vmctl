@@ -15,6 +15,8 @@ module VMCtl
         parser = OptionParser.new do |p|
           p.on('--autostart')    { opts[:autostart] = true }
           p.on('--no-autostart') { opts[:autostart] = false }
+          p.on('--graphics')     { opts[:graphics] = true }
+          p.on('--no-graphics')  { opts[:graphics] = false }
           p.on('--network NET')  { |v| opts[:network] = v }
           p.on('--mtu N')        { |v| opts[:mtu] = v }
           p.on('--cpus N')      { |v| opts[:cpus] = v }
@@ -46,6 +48,10 @@ module VMCtl
         if opts.key?(:autostart)
           e.autostart = opts[:autostart]
           changed << "autostart=#{e.autostart}"
+        end
+        if opts.key?(:graphics)
+          e.graphics = opts[:graphics]
+          changed << "graphics=#{e.graphics}"
         end
         if opts.key?(:network)
           Netgraph.new(executor).ensure_bridge!(opts[:network]) unless opts[:network] == 'none'

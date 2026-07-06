@@ -110,6 +110,58 @@ class TestStatusCommand < Minitest::Test
     assert_match(/stop --force pod34/, out)
     refute_match(/running/, out)
   end
+
+  def graphics_config
+    inv = <<~YAML
+      defaults:
+        config_dir: #{config_dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: #{run_dir}
+        log_dir: #{run_dir}
+      vms:
+        pod34:
+          config: pod.conf
+          network: labs_vlan50
+          link: 10
+          graphics: true
+          disks: [{ file: pod34-root.raw, size: 20G }]
+    YAML
+    f = Tempfile.new(['inv', '.yml']); f.write(inv); f.flush
+    VMCtl::Config.load(f.path)
+  end
+
+  def test_status_shows_vnc_endpoint_for_graphics_vm
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false })
+    cmd = VMCtl::Commands::Status.new(config: graphics_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/vnc 0\.0\.0\.0:5910/, out)
+  end
+
+  def test_status_omits_vnc_for_non_graphics_vm
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false })
+    cmd = VMCtl::Commands::Status.new(config: load_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    refute_match(/vnc/, out)
+  end
+
+  def test_status_shows_vnc_endpoint_when_running
+    File.write(File.join(run_dir, 'pod34.pid'), '4242')
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true, 'kill -0 4242' => true })
+    cmd = VMCtl::Commands::Status.new(config: graphics_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/running/, out)
+    assert_match(/vnc 0\.0\.0\.0:5910/, out)
+  end
+
+  def test_status_shows_vnc_endpoint_when_stale
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true })  # no pidfile -> stale
+    cmd = VMCtl::Commands::Status.new(config: graphics_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/stale/, out)
+    assert_match(/vnc 0\.0\.0\.0:5910/, out)
+  end
 end
 
 class TestStartCommand < Minitest::Test

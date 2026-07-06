@@ -10,6 +10,7 @@ module VMCtl
         vms = targets(args, all: all || args.empty?)
         vms.each do |vm|
           net = "(#{vm.entry.network} link #{vm.entry.link})"
+          net = "#{net} vnc #{vm.vnc_endpoint}" if vm.entry.graphics
           if !vm.running?(executor)
             puts "#{vm.name}: stopped #{net}"
           elsif vm.supervisor_alive?(executor)
