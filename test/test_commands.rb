@@ -145,6 +145,23 @@ class TestStatusCommand < Minitest::Test
     out = capture_stdout { cmd.call(['pod34']) }
     refute_match(/vnc/, out)
   end
+
+  def test_status_shows_vnc_endpoint_when_running
+    File.write(File.join(run_dir, 'pod34.pid'), '4242')
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true, 'kill -0 4242' => true })
+    cmd = VMCtl::Commands::Status.new(config: graphics_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/running/, out)
+    assert_match(/vnc 0\.0\.0\.0:5910/, out)
+  end
+
+  def test_status_shows_vnc_endpoint_when_stale
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true })  # no pidfile -> stale
+    cmd = VMCtl::Commands::Status.new(config: graphics_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/stale/, out)
+    assert_match(/vnc 0\.0\.0\.0:5910/, out)
+  end
 end
 
 class TestStartCommand < Minitest::Test

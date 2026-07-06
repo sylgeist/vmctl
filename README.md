@@ -138,7 +138,8 @@ requirement:
   `localhost:5910`.
 
 Templates must NOT declare `cpus`, `memory.size`, `pci.0.3.*`, `pci.0.4.*`,
-`pci.0.5.*`, or `pci.0.6.*` — vmctl injects them all at start. At `start`,
+`pci.0.5.*`, `pci.0.6.*`, or (when `graphics: true`) `pci.0.7.*`/`pci.0.8.*` —
+vmctl injects them all at start. At `start`,
 vmctl renders the fully-resolved config to `<run_dir>/<name>.conf` (ephemeral,
 regenerated every start — do not hand-edit) and launches
 `bhyve -k <run_dir>/<name>.conf <name>`. Per-VM `options:` in the inventory
