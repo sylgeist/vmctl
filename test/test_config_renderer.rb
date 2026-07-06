@@ -12,16 +12,18 @@ class TestConfigRenderer < Minitest::Test
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'base.conf', link_base: 10,
       run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
-      cpus: 1, memory: '1G'
+      cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0'
     )
   end
 
   def entry(disks:, mac: nil, iso: nil, cloud_init: nil, options: {}, config: 'base.conf',
-            network: 'labs_vlan50', mtu: nil, networks: [], cpus: nil, memory: nil)
+            network: 'labs_vlan50', mtu: nil, networks: [], cpus: nil, memory: nil,
+            graphics: false)
     VMCtl::VMEntry.new(
       name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true, disks: disks, cloud_init: cloud_init, iso: iso,
-      options: options, mtu: mtu, networks: networks, cpus: cpus, memory: memory
+      options: options, mtu: mtu, networks: networks, cpus: cpus, memory: memory,
+      graphics: graphics
     )
   end
 
@@ -201,5 +203,46 @@ class TestConfigRenderer < Minitest::Test
     out = render("cpus=2\n", entry(disks: [], cpus: 8, options: { 'cpus' => 5 }))
     assert_match(/^cpus=8$/, out)                 # generated beats options
     refute_match(/^cpus=5$/, out)
+  end
+
+  def test_no_graphics_keys_when_disabled
+    out = render("cpus=2\n", entry(disks: []))
+    refute_match(/pci\.0\.7\./, out)
+    refute_match(/pci\.0\.8\./, out)
+  end
+
+  def test_graphics_generates_fbuf_and_tablet
+    out = render("cpus=2\n", entry(disks: [], graphics: true))
+    assert_match(/^pci\.0\.7\.0\.device=fbuf$/, out)
+    assert_match(/^pci\.0\.7\.0\.tcp=0\.0\.0\.0:5910$/, out)   # vnc_base 5900 + link 10
+    assert_match(/^pci\.0\.7\.0\.w=1024$/, out)
+    assert_match(/^pci\.0\.7\.0\.h=768$/, out)
+    assert_match(/^pci\.0\.7\.0\.wait=false$/, out)
+    assert_match(/^pci\.0\.8\.0\.device=xhci$/, out)
+    assert_match(/^pci\.0\.8\.0\.slot\.1\.device=tablet$/, out)
+  end
+
+  def test_graphics_port_tracks_bind_from_defaults
+    # Render with a loopback bind + custom base to prove the endpoint is data-driven.
+    Dir.mktmpdir do |dir|
+      e = entry(disks: [], graphics: true)
+      File.write(File.join(dir, e.config), "cpus=2\n")
+      d = VMCtl::Defaults.new(
+        config_dir: dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
+        template: 'base.conf', link_base: 10,
+        run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
+        cpus: 1, memory: '1G', vnc_base: 6000, vnc_bind: '127.0.0.1'
+      )
+      vm = VMCtl::VM.new(e, d)
+      out = VMCtl::ConfigRenderer.new(d).render(vm)
+      assert_match(/^pci\.0\.7\.0\.tcp=127\.0\.0\.1:6010$/, out)
+    end
+  end
+
+  def test_graphics_keys_beat_options
+    e = entry(disks: [], graphics: true, options: { 'pci.0.7.0.device' => 'evil' })
+    out = render("cpus=2\n", e)
+    assert_match(/^pci\.0\.7\.0\.device=fbuf$/, out)
+    refute_match(/evil/, out)
   end
 end
