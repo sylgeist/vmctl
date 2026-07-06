@@ -211,4 +211,45 @@ class TestSetCommand < Minitest::Test
     capture_stdout { cmd.call(['pod34', '--no-graphics']) }
     assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod34').graphics
   end
+
+  def test_set_efi_vars
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--efi-vars']) }
+    assert_equal true, VMCtl::Config.load(@inv).vms.fetch('pod34').efi_vars
+  end
+
+  def efi_inventory
+    File.write(@inv, <<~YAML)
+      defaults: { config_dir: #{@dir}, vm_root: /bhyve, zpool: tank, link_base: 10 }
+      vms:
+        pod34:
+          config: pod.conf
+          network: labs_vlan50
+          link: 10
+          efi_vars: true
+          disks: [{ file: pod34-root.raw, size: 20G }]
+    YAML
+  end
+
+  def test_set_no_efi_vars
+    efi_inventory
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--no-efi-vars']) }
+    assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod34').efi_vars
+  end
+
+  def test_set_reset_efi_vars_removes_file
+    efi_inventory
+    exec = stopped
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: exec)
+    capture_stdout { cmd.call(['pod34', '--reset-efi-vars']) }
+    assert_includes exec.runs, ['rm', '-f', '/bhyve/pod34/pod34-uefi-vars.fd']
+  end
+
+  def test_set_reset_efi_vars_errors_when_disabled
+    # default inventory (setup) has no efi_vars on pod34
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--reset-efi-vars']) }
+    assert_match(/does not have efi_vars/, err.message)
+  end
 end
