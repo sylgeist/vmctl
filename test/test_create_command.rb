@@ -220,6 +220,38 @@ class TestCreateCommand < Minitest::Test
     assert_match(/iso not found/, err.message)
   end
 
+  def test_create_cpus_and_memory
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--cpus', '4', '--memory', '8G']) }
+    entry = VMCtl::Config.load(@inv).vms.fetch('pod35')
+    assert_equal 4, entry.cpus
+    assert_equal '8G', entry.memory
+  end
+
+  def test_create_defaults_cpus_memory_when_omitted
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50']) }
+    entry = VMCtl::Config.load(@inv).vms.fetch('pod35')
+    assert_nil entry.cpus       # nil -> renderer applies defaults.cpus
+    assert_nil entry.memory
+  end
+
+  def test_create_rejects_bad_cpus
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--cpus', '0'])
+    end
+  end
+
+  def test_create_rejects_bad_memory
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: bridge_ok)
+    assert_raises(VMCtl::Commands::CommandError) do
+      cmd.call(['pod35', '--network', 'labs_vlan50', '--memory', '1GB'])
+    end
+  end
+
   def test_create_network_none_skips_bridge_and_succeeds
     # If create wrongly probed a 'none' bridge, this false probe would make it
     # raise; success proves the primary-bridge check is skipped for `none`.

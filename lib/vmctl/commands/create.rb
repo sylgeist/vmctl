@@ -48,6 +48,8 @@ module VMCtl
           p.on('--cloud-init FILE') { |v| o[:cloud_init] = v }
           p.on('--var KV') { |v| k, val = v.split('=', 2); raise CommandError, "invalid --var #{v.inspect}" unless k =~ /\A\w+\z/ && val; o[:vars][k] = val }
           p.on('--iso FILE')    { |v| o[:iso] = v }
+          p.on('--cpus N')     { |v| o[:cpus] = v }
+          p.on('--memory SIZE') { |v| o[:memory] = v }
           p.on('--autostart')   { o[:autostart] = true }
           p.on('--start')       { o[:start] = true }
         end
@@ -74,7 +76,9 @@ module VMCtl
           autostart: !!opts[:autostart],
           disks: disks,
           cloud_init: nil,
-          iso: opts[:iso] && File.expand_path(opts[:iso])
+          iso: opts[:iso] && File.expand_path(opts[:iso]),
+          cpus: opts[:cpus] && positive_int!(opts[:cpus], '--cpus'),
+          memory: opts[:memory] && valid_size!(opts[:memory], '--memory')
         )
       end
 
