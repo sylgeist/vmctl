@@ -256,6 +256,13 @@ class TestConfigRenderer < Minitest::Test
     assert_match(%r{^bootvars=/bhyve/pod34/pod34-uefi-vars\.fd$}, out)
   end
 
+  def test_bootvars_beats_options
+    e = entry(disks: [], efi_vars: true, options: { 'bootvars' => '/evil' })
+    out = render("cpus=2\n", e)
+    assert_match(%r{^bootvars=/bhyve/pod34/pod34-uefi-vars\.fd$}, out)
+    refute_match(%r{/evil}, out)
+  end
+
   def test_resolve_returns_key_map
     e = entry(disks: [VMCtl::Disk.new(file: 'pod34-root.raw', size: '20G', from: nil)])
     Dir.mktmpdir do |dir|
