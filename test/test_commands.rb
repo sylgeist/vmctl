@@ -93,11 +93,22 @@ class TestStatusCommand < Minitest::Test
     assert_match(/stopped/, out)
   end
 
-  def test_status_reports_running_when_vmm_device_present
-    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true })
+  def test_status_reports_running_when_vmm_and_live_supervisor
+    File.write(File.join(run_dir, 'pod34.pid'), '4242')
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true, 'kill -0 4242' => true })
     cmd = VMCtl::Commands::Status.new(config: load_config, executor: exec)
     out = capture_stdout { cmd.call(['pod34']) }
     assert_match(/running/, out)
+    assert_match(/pid 4242/, out)
+  end
+
+  def test_status_reports_stale_when_vmm_but_no_live_supervisor
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true })  # no pidfile -> stale
+    cmd = VMCtl::Commands::Status.new(config: load_config, executor: exec)
+    out = capture_stdout { cmd.call(['pod34']) }
+    assert_match(/stale/, out)
+    assert_match(/stop --force pod34/, out)
+    refute_match(/running/, out)
   end
 end
 
@@ -131,12 +142,19 @@ class TestStartCommand < Minitest::Test
   end
 
   def test_start_refuses_when_already_running
-    exec = FakeExecutor.new(
-      probes: { 'ngctl info labs_vlan50:' => true, '/dev/vmm/pod34' => true }
-    )
+    File.write(File.join(run_dir, 'pod34.pid'), '4242')
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true, 'kill -0 4242' => true })
     cmd = VMCtl::Commands::Start.new(config: load_config, executor: exec)
     err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
     assert_match(/already running/, err.message)
+  end
+
+  def test_start_reports_stale_vmm_device
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true })  # no pidfile -> stale
+    cmd = VMCtl::Commands::Start.new(config: load_config, executor: exec)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
+    assert_match(/stale vmm device/, err.message)
+    assert_match(/stop --force pod34/, err.message)
   end
 
   def test_start_all_targets_only_autostart_vms
