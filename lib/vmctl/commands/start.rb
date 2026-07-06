@@ -39,6 +39,7 @@ module VMCtl
         end
         vm.nic_bridges.each { |b| @netgraph.ensure_bridge!(b) }
         ensure_bootrom!(vm)
+        ensure_efi_vars!(vm)
         vm.write_config
         sup = @factory.call(vm)
         pid = sup.start
@@ -51,6 +52,17 @@ module VMCtl
         return if executor.success?('test', '-e', rom)
         raise CommandError,
               "bootrom not found: #{rom} (install the uefi-edk2-bhyve package?)"
+      end
+
+      def ensure_efi_vars!(vm)
+        return unless vm.entry.efi_vars
+        template = config.defaults.uefi_vars_template
+        unless executor.success?('test', '-e', template)
+          raise CommandError,
+                "UEFI vars template not found: #{template} (install the uefi-edk2-bhyve package?)"
+        end
+        return if executor.success?('test', '-e', vm.uefi_vars_path)
+        executor.run('cp', template, vm.uefi_vars_path)
       end
     end
   end

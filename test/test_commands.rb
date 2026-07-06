@@ -345,6 +345,72 @@ class TestStartCommand < Minitest::Test
     capture_stdout { cmd.call(['pod34']) }
     assert_equal ['pod34'], started
   end
+
+  def efi_config
+    dir = Dir.mktmpdir
+    File.write(File.join(dir, 'pod.conf'), "lpc.com1.path=/dev/nmdm%(link)A\n")
+    inv = <<~YAML
+      defaults:
+        config_dir: #{dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: #{run_dir}
+        log_dir: #{run_dir}
+      vms:
+        pod34:
+          config: pod.conf
+          network: labs_vlan50
+          link: 10
+          efi_vars: true
+          disks: [{ file: pod34-root.raw, size: 20G }]
+    YAML
+    f = Tempfile.new(['inv', '.yml']); f.write(inv); f.flush
+    VMCtl::Config.load(f.path)
+  end
+
+  TEMPLATE = '/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd'
+  VARS = '/bhyve/pod34/pod34-uefi-vars.fd'
+
+  def test_start_copies_pristine_vars_when_missing
+    exec = FakeExecutor.new(probes: {
+      'ngctl info labs_vlan50:' => true,
+      '/dev/vmm/pod34' => false,
+      "test -e #{VARS}" => false          # per-VM vars file absent -> must copy
+      # TEMPLATE probe unspecified -> true (template present)
+    })
+    factory = ->(_vm, **) { TestStartCommand::FakeSupervisor.new }
+    cmd = VMCtl::Commands::Start.new(config: efi_config, executor: exec,
+                                     supervisor_factory: factory)
+    capture_stdout { cmd.call(['pod34']) }
+    assert_includes exec.runs, ['cp', TEMPLATE, VARS]
+  end
+
+  def test_start_skips_copy_when_vars_present
+    exec = FakeExecutor.new(probes: {
+      'ngctl info labs_vlan50:' => true,
+      '/dev/vmm/pod34' => false
+      # VARS probe unspecified -> true (file present) -> no copy
+    })
+    factory = ->(_vm, **) { TestStartCommand::FakeSupervisor.new }
+    cmd = VMCtl::Commands::Start.new(config: efi_config, executor: exec,
+                                     supervisor_factory: factory)
+    capture_stdout { cmd.call(['pod34']) }
+    refute(exec.runs.any? { |a| a.first == 'cp' }, 'must not copy when vars exist')
+  end
+
+  def test_start_refuses_when_vars_template_missing
+    exec = FakeExecutor.new(probes: {
+      'ngctl info labs_vlan50:' => true,
+      '/dev/vmm/pod34' => false,
+      "test -e #{VARS}" => false,
+      "test -e #{TEMPLATE}" => false      # pristine template absent
+    })
+    cmd = VMCtl::Commands::Start.new(config: efi_config, executor: exec,
+                                     supervisor_factory: ->(_vm, **) { flunk 'must not start' })
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
+    assert_match(/UEFI vars template not found/, err.message)
+  end
 end
 
 class TestStopCommand < Minitest::Test
