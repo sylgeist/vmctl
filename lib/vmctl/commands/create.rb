@@ -51,6 +51,7 @@ module VMCtl
           p.on('--cpus N')     { |v| o[:cpus] = v }
           p.on('--memory SIZE') { |v| o[:memory] = v }
           p.on('--autostart')   { o[:autostart] = true }
+          p.on('--graphics')    { o[:graphics] = true }
           p.on('--start')       { o[:start] = true }
         end
         rest = parser.parse(args)
@@ -78,7 +79,8 @@ module VMCtl
           cloud_init: nil,
           iso: opts[:iso] && File.expand_path(opts[:iso]),
           cpus: opts[:cpus] && positive_int!(opts[:cpus], '--cpus'),
-          memory: opts[:memory] && valid_size!(opts[:memory], '--memory')
+          memory: opts[:memory] && valid_size!(opts[:memory], '--memory'),
+          graphics: !!opts[:graphics]
         )
       end
 

@@ -252,6 +252,20 @@ class TestCreateCommand < Minitest::Test
     end
   end
 
+  def test_create_with_graphics
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--graphics']) }
+    assert_equal true, VMCtl::Config.load(@inv).vms.fetch('pod35').graphics
+  end
+
+  def test_create_without_graphics_defaults_false
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50']) }
+    assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod35').graphics
+  end
+
   def test_create_network_none_skips_bridge_and_succeeds
     # If create wrongly probed a 'none' bridge, this false probe would make it
     # raise; success proves the primary-bridge check is skipped for `none`.
