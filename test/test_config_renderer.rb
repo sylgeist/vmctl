@@ -214,7 +214,7 @@ class TestConfigRenderer < Minitest::Test
   def test_graphics_generates_fbuf_and_tablet
     out = render("cpus=2\n", entry(disks: [], graphics: true))
     assert_match(/^pci\.0\.7\.0\.device=fbuf$/, out)
-    assert_match(/^pci\.0\.7\.0\.tcp=0\.0\.0\.0:5910$/, out)   # vnc_base 5900 + link 10
+    assert_match(/^pci\.0\.7\.0\.rfb=0\.0\.0\.0:5910$/, out)   # fbuf key is 'rfb'; vnc_base 5900 + link 10
     assert_match(/^pci\.0\.7\.0\.w=1024$/, out)
     assert_match(/^pci\.0\.7\.0\.h=768$/, out)
     assert_match(/^pci\.0\.7\.0\.wait=false$/, out)
@@ -235,7 +235,7 @@ class TestConfigRenderer < Minitest::Test
       )
       vm = VMCtl::VM.new(e, d)
       out = VMCtl::ConfigRenderer.new(d).render(vm)
-      assert_match(/^pci\.0\.7\.0\.tcp=127\.0\.0\.1:6010$/, out)
+      assert_match(/^pci\.0\.7\.0\.rfb=127\.0\.0\.1:6010$/, out)
     end
   end
 

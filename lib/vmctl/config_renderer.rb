@@ -62,7 +62,9 @@ module VMCtl
       return {} unless vm.entry.graphics
       {
         'pci.0.7.0.device'        => 'fbuf',
-        'pci.0.7.0.tcp'           => vm.vnc_endpoint,
+        # bhyve_config's fbuf VNC address key is 'rfb' (NOT 'tcp' — that's the
+        # UART key); an unknown key makes bhyve fall back to 127.0.0.1:5900.
+        'pci.0.7.0.rfb'           => vm.vnc_endpoint,
         'pci.0.7.0.w'             => '1024',
         'pci.0.7.0.h'             => '768',
         'pci.0.7.0.wait'          => 'false',
