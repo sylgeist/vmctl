@@ -538,4 +538,83 @@ class TestConfig < Minitest::Test
     refute h['vms']['b'].key?('memory_wired'), 'memory_wired omitted when false'
     f.close
   end
+
+  def test_defaults_smbios_parsed_and_stringified
+    f = write_inventory(<<~YAML)
+      defaults:
+        smbios:
+          system.manufacturer: MyLab
+          bios.version: 14.0
+      vms: {}
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal({ 'system.manufacturer' => 'MyLab', 'bios.version' => '14.0' },
+                 cfg.defaults.smbios)
+    f.close
+  end
+
+  def test_defaults_smbios_absent_is_empty
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal({}, cfg.defaults.smbios)
+    f.close
+  end
+
+  def test_smbios_rejects_non_mapping
+    f = write_inventory("defaults: { smbios: nope }\nvms: {}\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_defaults_smbios_rejects_bad_namespace
+    f = write_inventory(<<~YAML)
+      defaults:
+        smbios:
+          pci.0.3.0.path: /evil
+      vms: {}
+    YAML
+    err = assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    assert_match(/invalid smbios key/, err.message)
+    f.close
+  end
+
+  def test_vm_smbios_parsed_and_bad_namespace_rejected
+    ok = write_inventory(<<~YAML)
+      vms:
+        a: { network: n, link: 10, smbios: { system.serial_number: POD34-001 } }
+    YAML
+    cfg = VMCtl::Config.load(ok.path)
+    assert_equal({ 'system.serial_number' => 'POD34-001' }, cfg.vms.fetch('a').smbios)
+    ok.close
+
+    bad = write_inventory(<<~YAML)
+      vms:
+        a: { network: n, link: 10, smbios: { foo.bar: x } }
+    YAML
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(bad.path) }
+    bad.close
+  end
+
+  def test_vm_smbios_absent_is_empty
+    f = write_inventory("vms:\n  a: { network: n, link: 10 }\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal({}, cfg.vms.fetch('a').smbios)
+    f.close
+  end
+
+  def test_smbios_round_trip
+    f = write_inventory(<<~YAML)
+      defaults:
+        smbios: { system.manufacturer: MyLab }
+      vms:
+        a: { network: n, link: 10, smbios: { system.serial_number: S1 }, disks: [] }
+        b: { network: n, link: 11, disks: [] }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    h = cfg.to_h
+    assert_equal({ 'system.manufacturer' => 'MyLab' }, h['defaults']['smbios'])
+    assert_equal({ 'system.serial_number' => 'S1' }, h['vms']['a']['smbios'])
+    refute h['vms']['b'].key?('smbios'), 'empty per-VM smbios omitted'
+    f.close
+  end
 end
