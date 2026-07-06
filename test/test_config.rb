@@ -393,4 +393,54 @@ class TestConfig < Minitest::Test
     inv = "vms:\n  p: { network: n, link: 10, disks: [], memory: 1GB }\n"
     assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv).path) }
   end
+
+  def test_vnc_defaults_fill_in
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal 5900, cfg.defaults.vnc_base
+    assert_equal '0.0.0.0', cfg.defaults.vnc_bind
+    f.close
+  end
+
+  def test_vnc_defaults_override
+    f = write_inventory(<<~YAML)
+      defaults: { vnc_base: 6000, vnc_bind: 127.0.0.1 }
+      vms: {}
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal 6000, cfg.defaults.vnc_base
+    assert_equal '127.0.0.1', cfg.defaults.vnc_bind
+    f.close
+  end
+
+  def test_bad_vnc_base_raises
+    f = write_inventory("defaults: { vnc_base: nope }\nvms: {}\n")
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    f.close
+  end
+
+  def test_graphics_parsed_and_defaults_false
+    f = write_inventory(<<~YAML)
+      vms:
+        g1: { network: n, link: 10, graphics: true }
+        g2: { network: n, link: 11 }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal true, cfg.vms.fetch('g1').graphics
+    assert_equal false, cfg.vms.fetch('g2').graphics
+    f.close
+  end
+
+  def test_graphics_round_trips_only_when_true
+    f = write_inventory(<<~YAML)
+      vms:
+        g1: { network: n, link: 10, graphics: true, disks: [] }
+        g2: { network: n, link: 11, disks: [] }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    h = cfg.to_h
+    assert_equal true, h['vms']['g1']['graphics']
+    refute h['vms']['g2'].key?('graphics'), 'graphics omitted when false'
+    f.close
+  end
 end
