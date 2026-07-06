@@ -21,6 +21,11 @@ defaults:
   vnc_bind: 0.0.0.0            # VNC bind address; 0.0.0.0 is reachable from any routable host
   uefi_vars_template: /usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd  # pristine UEFI vars store (from uefi-edk2-bhyve), copied per-VM when efi_vars: true
   rtc_localtime: true          # RTC time base for all VMs: true=localtime (bhyve default), false=UTC. Set false for a UTC homelab.
+  # smbios:                      # SMBIOS identity applied to every VM (bhyve keys)
+  #   system.manufacturer: MyLab
+  #   system.product_name: pod
+  #   board.manufacturer: MyLab
+  #   chassis.manufacturer: MyLab
 
 vms:
   # A two-disk VM (root + a separate data disk), started at host boot.
@@ -40,6 +45,9 @@ vms:
     # efi_vars: true           # give this VM a persistent UEFI variables store (boot order etc. survive reboots)
     # rtc_localtime: false    # this VM's clock uses UTC (Linux/BSD guests)
     # memory_wired: true      # pin (wire) this VM's guest memory; host won't swap it
+    # smbios:                    # per-VM SMBIOS overrides/additions (beats defaults.smbios)
+    #   system.serial_number: POD34-001
+    #   chassis.asset_tag: rack3-u12
     disks:
       - { file: pod34-root.raw, size: 20G, from: base-14.raw }  # cloned from the golden image
       - { file: pod34-zfs.raw,  size: 100G }                    # blank second disk
