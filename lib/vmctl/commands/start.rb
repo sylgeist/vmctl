@@ -38,10 +38,19 @@ module VMCtl
           raise CommandError, "#{vm.name} has #{vm.nic_count} NICs (max 8: pci.0.4.0-7)"
         end
         vm.nic_bridges.each { |b| @netgraph.ensure_bridge!(b) }
+        ensure_bootrom!(vm)
         vm.write_config
         sup = @factory.call(vm)
         pid = sup.start
         puts "started #{vm.name} (supervisor pid #{pid})"
+      end
+
+      def ensure_bootrom!(vm)
+        rom = vm.resolved_config['bootrom']
+        return if rom.nil?
+        return if executor.success?('test', '-e', rom)
+        raise CommandError,
+              "bootrom not found: #{rom} (install the uefi-edk2-bhyve package?)"
       end
     end
   end

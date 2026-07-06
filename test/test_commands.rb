@@ -292,6 +292,59 @@ class TestStartCommand < Minitest::Test
     err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
     assert_match(/max 8/, err.message)
   end
+
+  # A config whose VM's template declares a bootrom path.
+  def bootrom_config(rom)
+    dir = Dir.mktmpdir
+    File.write(File.join(dir, 'uefi.conf'),
+               "bootrom=#{rom}\nlpc.com1.path=/dev/nmdm%(link)A\n")
+    inv = <<~YAML
+      defaults:
+        config_dir: #{dir}
+        vm_root: /bhyve
+        zpool: tank/bhyve
+        link_base: 10
+        run_dir: #{run_dir}
+        log_dir: #{run_dir}
+      vms:
+        pod34:
+          config: uefi.conf
+          network: labs_vlan50
+          link: 10
+          disks: [{ file: pod34-root.raw, size: 20G }]
+    YAML
+    f = Tempfile.new(['inv', '.yml']); f.write(inv); f.flush
+    VMCtl::Config.load(f.path)
+  end
+
+  def test_start_refuses_when_bootrom_missing
+    rom = '/fw/BHYVE_UEFI.fd'
+    exec = FakeExecutor.new(probes: {
+      'ngctl info labs_vlan50:' => true,
+      '/dev/vmm/pod34' => false,
+      "test -e #{rom}" => false          # bootrom file absent
+    })
+    cmd = VMCtl::Commands::Start.new(config: bootrom_config(rom), executor: exec,
+                                     supervisor_factory: ->(_vm, **) { flunk 'must not start' })
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
+    assert_match(/bootrom not found/, err.message)
+    assert_match(%r{/fw/BHYVE_UEFI\.fd}, err.message)
+  end
+
+  def test_start_allows_when_bootrom_present
+    rom = '/fw/BHYVE_UEFI.fd'
+    # bootrom probe unspecified -> FakeExecutor returns true -> check passes.
+    exec = FakeExecutor.new(probes: {
+      'ngctl info labs_vlan50:' => true,
+      '/dev/vmm/pod34' => false
+    })
+    started = []
+    factory = ->(vm, **) { started << vm.name; TestStartCommand::FakeSupervisor.new }
+    cmd = VMCtl::Commands::Start.new(config: bootrom_config(rom), executor: exec,
+                                     supervisor_factory: factory)
+    capture_stdout { cmd.call(['pod34']) }
+    assert_equal ['pod34'], started
+  end
 end
 
 class TestStopCommand < Minitest::Test
