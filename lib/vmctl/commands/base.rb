@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 # lib/vmctl/commands/base.rb
 require_relative '../vm'
+require_relative '../sizes'
 
 module VMCtl
   module Commands
@@ -53,6 +54,19 @@ module VMCtl
       # relative paths are joined to config_dir.
       def cloud_init_template(t)
         File.absolute_path?(t) ? t : File.join(config.defaults.config_dir, t)
+      end
+
+      def positive_int!(v, flag)
+        n = Integer(v, exception: false)
+        raise CommandError, "invalid #{flag} #{v.inspect}" if n.nil? || n <= 0
+        n
+      end
+
+      def valid_size!(v, flag)
+        Sizes.parse(v)
+        v
+      rescue ArgumentError
+        raise CommandError, "invalid #{flag} #{v.inspect}"
       end
 
     end

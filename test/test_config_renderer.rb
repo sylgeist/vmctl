@@ -11,16 +11,17 @@ class TestConfigRenderer < Minitest::Test
     VMCtl::Defaults.new(
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'base.conf', link_base: 10,
-      run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl'
+      run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
+      cpus: 1, memory: '1G'
     )
   end
 
   def entry(disks:, mac: nil, iso: nil, cloud_init: nil, options: {}, config: 'base.conf',
-            network: 'labs_vlan50', mtu: nil, networks: [])
+            network: 'labs_vlan50', mtu: nil, networks: [], cpus: nil, memory: nil)
     VMCtl::VMEntry.new(
       name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true, disks: disks, cloud_init: cloud_init, iso: iso,
-      options: options, mtu: mtu, networks: networks
+      options: options, mtu: mtu, networks: networks, cpus: cpus, memory: memory
     )
   end
 
@@ -63,10 +64,9 @@ class TestConfigRenderer < Minitest::Test
   end
 
   def test_options_override_base
-    out = render("cpus=2\nmemory.size=4G\n",
-                 entry(disks: [], options: { 'cpus' => 4 }))
-    assert_match(/^cpus=4$/, out)
-    refute_match(/^cpus=2$/, out)
+    out = render("custom=2\n", entry(disks: [], options: { 'custom' => 4 }))
+    assert_match(/^custom=4$/, out)
+    refute_match(/^custom=2$/, out)
   end
 
   def test_managed_disk_keys_beat_options
@@ -80,12 +80,12 @@ class TestConfigRenderer < Minitest::Test
   def test_comments_and_blank_lines_dropped
     out = render("# a comment\n\ncpus=2\n", entry(disks: []))
     refute_match(/comment/, out)
-    assert_match(/^cpus=2$/, out)
+    assert_match(/^cpus=1$/, out)
   end
 
   def test_output_is_sorted
     out = render("zeta=1\nalpha=2\n", entry(disks: [], network: 'none'))
-    assert_equal %w[alpha=2 zeta=1], out.split("\n")
+    assert_equal %w[alpha=2 cpus=1 memory.size=1G zeta=1], out.split("\n")
   end
 
   def test_iso_substituted_when_set
@@ -98,7 +98,7 @@ class TestConfigRenderer < Minitest::Test
     body = +"# notes \xFF \xE2\x80\x94 bytes\n".b
     body << "cpus=2\n"
     out = render(body, entry(disks: []))
-    assert_match(/^cpus=2$/, out)
+    assert_match(/^cpus=1$/, out)
   end
 
   def test_primary_nic_matches_legacy_keys
@@ -181,5 +181,25 @@ class TestConfigRenderer < Minitest::Test
     out = render("cpus=2\n", entry(disks: [], iso: '/i.iso', cloud_init: { 'user_data' => 'x.yml' }))
     assert_match(/^pci\.0\.5\.0\.device=ahci$/, out)
     assert_match(/^pci\.0\.6\.0\.device=ahci$/, out)
+  end
+
+  def test_hardware_from_entry
+    out = render("cpus=99\nmemory.size=99G\n", entry(disks: [], cpus: 2, memory: '4G'))
+    assert_match(/^cpus=2$/, out)
+    assert_match(/^memory\.size=4G$/, out)
+    refute_match(/^cpus=99$/, out)          # generated overrides the flavor
+    refute_match(/^memory\.size=99G$/, out)
+  end
+
+  def test_hardware_falls_back_to_defaults
+    out = render("cpus=99\n", entry(disks: []))   # entry cpus/memory nil
+    assert_match(/^cpus=1$/, out)                 # defaults(dir) -> cpus 1
+    assert_match(/^memory\.size=1G$/, out)
+  end
+
+  def test_hardware_overrides_options
+    out = render("cpus=2\n", entry(disks: [], cpus: 8, options: { 'cpus' => 5 }))
+    assert_match(/^cpus=8$/, out)                 # generated beats options
+    refute_match(/^cpus=5$/, out)
   end
 end

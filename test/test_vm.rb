@@ -11,7 +11,8 @@ class TestVM < Minitest::Test
     VMCtl::Defaults.new(
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'pod.conf', link_base: 10,
-      run_dir: run_dir, log_dir: '/var/log/vmctl'
+      run_dir: run_dir, log_dir: '/var/log/vmctl',
+      cpus: 1, memory: '1G'
     )
   end
 
@@ -47,11 +48,12 @@ class TestVM < Minitest::Test
       run = File.join(dir, 'run')
       d = VMCtl::Defaults.new(
         config_dir: cfgdir, vm_root: '/bhyve', zpool: 'tank/bhyve',
-        template: 'pod.conf', link_base: 10, run_dir: run, log_dir: '/l'
+        template: 'pod.conf', link_base: 10, run_dir: run, log_dir: '/l',
+        cpus: 1, memory: '1G'
       )
       vm = VMCtl::VM.new(entry, d)
       text = vm.render_config
-      assert_match(/^cpus=2$/, text)
+      assert_match(/^cpus=1$/, text)
       assert_match(%r{^lpc\.com1\.path=/dev/nmdm10A$}, text)
       assert_match(%r{^pci\.0\.3\.0\.path=/bhyve/pod34/pod34-root\.raw$}, text)
       path = vm.write_config
