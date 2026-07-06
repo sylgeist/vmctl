@@ -27,6 +27,8 @@ module VMCtl
       # may run under LANG=C; the scan/substitution must not raise on them.
       text = File.binread(vm.template_path)
       map = parse_pairs(substitute(text, vm.entry))
+      stringify(@defaults.smbios).each { |k, v| map[k] = v }   # global SMBIOS identity
+      stringify(vm.entry.smbios).each  { |k, v| map[k] = v }   # per-VM SMBIOS (beats global)
       stringify(vm.entry.options).each { |k, v| map[k] = v }
       generators.each { |gen| gen.call(vm).each { |k, v| map[k] = v } }
       map

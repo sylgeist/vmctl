@@ -7,33 +7,34 @@ require 'vmctl/vm'
 require 'vmctl/config_renderer'
 
 class TestConfigRenderer < Minitest::Test
-  def defaults(config_dir)
+  def defaults(config_dir, smbios: {})
     VMCtl::Defaults.new(
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'base.conf', link_base: 10,
       run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
       cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0',
-      rtc_localtime: true
+      rtc_localtime: true, smbios: smbios
     )
   end
 
   def entry(disks:, mac: nil, iso: nil, cloud_init: nil, options: {}, config: 'base.conf',
             network: 'labs_vlan50', mtu: nil, networks: [], cpus: nil, memory: nil,
-            graphics: false, efi_vars: false, rtc_localtime: nil, memory_wired: false)
+            graphics: false, efi_vars: false, rtc_localtime: nil, memory_wired: false,
+            smbios: {})
     VMCtl::VMEntry.new(
       name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true, disks: disks, cloud_init: cloud_init, iso: iso,
       options: options, mtu: mtu, networks: networks, cpus: cpus, memory: memory,
       graphics: graphics, efi_vars: efi_vars, rtc_localtime: rtc_localtime,
-      memory_wired: memory_wired
+      memory_wired: memory_wired, smbios: smbios
     )
   end
 
-  def render(flavor_body, e)
+  def render(flavor_body, e, smbios: {})
     Dir.mktmpdir do |dir|
       File.write(File.join(dir, e.config), flavor_body)
-      vm = VMCtl::VM.new(e, defaults(dir))
-      return VMCtl::ConfigRenderer.new(defaults(dir)).render(vm)
+      d = defaults(dir, smbios: smbios)
+      return VMCtl::ConfigRenderer.new(d).render(VMCtl::VM.new(e, d))
     end
   end
 
@@ -313,6 +314,40 @@ class TestConfigRenderer < Minitest::Test
     off = render("cpus=2\n", entry(disks: []))
     assert_match(/^memory\.wired=true$/, on)
     refute_match(/^memory\.wired=/, off)
+  end
+
+  def test_defaults_smbios_emitted
+    out = render("cpus=2\n", entry(disks: []), smbios: { 'system.manufacturer' => 'MyLab' })
+    assert_match(/^system\.manufacturer=MyLab$/, out)
+  end
+
+  def test_no_smbios_no_keys
+    out = render("cpus=2\n", entry(disks: []))
+    refute_match(/^system\./, out)
+    refute_match(/^bios\./, out)
+  end
+
+  def test_vm_smbios_overrides_defaults_smbios
+    out = render("cpus=2\n",
+                 entry(disks: [], smbios: { 'system.manufacturer' => 'PerVM' }),
+                 smbios: { 'system.manufacturer' => 'MyLab' })
+    assert_match(/^system\.manufacturer=PerVM$/, out)
+    refute_match(/^system\.manufacturer=MyLab$/, out)
+  end
+
+  def test_options_overrides_smbios
+    out = render("cpus=2\n",
+                 entry(disks: [], smbios: { 'system.manufacturer' => 'S' },
+                       options: { 'system.manufacturer' => 'O' }))
+    assert_match(/^system\.manufacturer=O$/, out)
+    refute_match(/^system\.manufacturer=S$/, out)
+  end
+
+  def test_defaults_smbios_overrides_template
+    out = render("system.manufacturer=TPL\n", entry(disks: []),
+                 smbios: { 'system.manufacturer' => 'MyLab' })
+    assert_match(/^system\.manufacturer=MyLab$/, out)
+    refute_match(/^system\.manufacturer=TPL$/, out)
   end
 
   def test_render_equals_serialized_resolve
