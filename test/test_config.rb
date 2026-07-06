@@ -443,4 +443,44 @@ class TestConfig < Minitest::Test
     refute h['vms']['g2'].key?('graphics'), 'graphics omitted when false'
     f.close
   end
+
+  def test_uefi_vars_template_default
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal '/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd',
+                 cfg.defaults.uefi_vars_template
+    f.close
+  end
+
+  def test_uefi_vars_template_override
+    f = write_inventory("defaults: { uefi_vars_template: /custom/VARS.fd }\nvms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal '/custom/VARS.fd', cfg.defaults.uefi_vars_template
+    f.close
+  end
+
+  def test_efi_vars_parsed_and_defaults_false
+    f = write_inventory(<<~YAML)
+      vms:
+        e1: { network: n, link: 10, efi_vars: true }
+        e2: { network: n, link: 11 }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal true, cfg.vms.fetch('e1').efi_vars
+    assert_equal false, cfg.vms.fetch('e2').efi_vars
+    f.close
+  end
+
+  def test_efi_vars_round_trips_only_when_true
+    f = write_inventory(<<~YAML)
+      vms:
+        e1: { network: n, link: 10, efi_vars: true, disks: [] }
+        e2: { network: n, link: 11, disks: [] }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    h = cfg.to_h
+    assert_equal true, h['vms']['e1']['efi_vars']
+    refute h['vms']['e2'].key?('efi_vars'), 'efi_vars omitted when false'
+    f.close
+  end
 end
