@@ -20,6 +20,10 @@ module VMCtl
           p.on('--efi-vars')     { opts[:efi_vars] = true }
           p.on('--no-efi-vars')  { opts[:efi_vars] = false }
           p.on('--reset-efi-vars') { opts[:reset_efi_vars] = true }
+          p.on('--rtc-localtime')     { opts[:rtc_localtime] = true }
+          p.on('--no-rtc-localtime')  { opts[:rtc_localtime] = false }
+          p.on('--memory-wired')      { opts[:memory_wired] = true }
+          p.on('--no-memory-wired')   { opts[:memory_wired] = false }
           p.on('--network NET')  { |v| opts[:network] = v }
           p.on('--mtu N')        { |v| opts[:mtu] = v }
           p.on('--cpus N')      { |v| opts[:cpus] = v }
@@ -85,6 +89,14 @@ module VMCtl
         if opts.key?(:efi_vars)
           e.efi_vars = opts[:efi_vars]
           changed << "efi_vars=#{e.efi_vars}"
+        end
+        if opts.key?(:rtc_localtime)
+          e.rtc_localtime = opts[:rtc_localtime]
+          changed << "rtc_localtime=#{e.rtc_localtime}"
+        end
+        if opts.key?(:memory_wired)
+          e.memory_wired = opts[:memory_wired]
+          changed << "memory_wired=#{e.memory_wired}"
         end
         if opts[:reset_efi_vars]
           reset_efi_vars!(vm, changed)

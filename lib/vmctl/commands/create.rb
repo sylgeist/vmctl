@@ -53,6 +53,9 @@ module VMCtl
           p.on('--autostart')   { o[:autostart] = true }
           p.on('--graphics')    { o[:graphics] = true }
           p.on('--efi-vars')    { o[:efi_vars] = true }
+          p.on('--rtc-localtime')    { o[:rtc_localtime] = true }
+          p.on('--no-rtc-localtime') { o[:rtc_localtime] = false }
+          p.on('--memory-wired')     { o[:memory_wired] = true }
           p.on('--start')       { o[:start] = true }
         end
         rest = parser.parse(args)
@@ -82,7 +85,9 @@ module VMCtl
           cpus: opts[:cpus] && positive_int!(opts[:cpus], '--cpus'),
           memory: opts[:memory] && valid_size!(opts[:memory], '--memory'),
           graphics: !!opts[:graphics],
-          efi_vars: !!opts[:efi_vars]
+          efi_vars: !!opts[:efi_vars],
+          rtc_localtime: opts[:rtc_localtime],
+          memory_wired: !!opts[:memory_wired]
         )
       end
 
