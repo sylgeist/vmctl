@@ -15,6 +15,8 @@ defaults:
   image_dir: /bhyve/images     # golden base images (the `from:` sources)
   root_size: 20G               # default size of the single root disk on `create`
   root_from: base-14.raw       # default golden image for root (set null for a blank disk)
+  cpus: 1                      # default vCPU count; per-VM override with `cpus:`
+  memory: 1G                   # default memory (Sizes format: 1G/512M); per-VM override with `memory:`
 
 vms:
   # A two-disk VM (root + a separate data disk), started at host boot.
@@ -27,6 +29,8 @@ vms:
     link: 10                   # globally unique: netgraph peerhook AND /dev/nmdm10
     mac: null                  # null => bhyve auto-generates a MAC
     autostart: true            # started by `vmctl start --all` (the rc.d shim) at boot
+    cpus: 2                    # per-VM override of defaults.cpus
+    memory: 4G                 # per-VM override of defaults.memory
     disks:
       - { file: pod34-root.raw, size: 20G, from: base-14.raw }  # cloned from the golden image
       - { file: pod34-zfs.raw,  size: 100G }                    # blank second disk

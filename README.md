@@ -30,6 +30,8 @@ defaults:
   link_base: 10                # lowest auto-assigned link (0-9 reserved)
   run_dir: /var/run/vmctl      # supervisor pidfiles
   log_dir: /var/log/vmctl      # per-VM bhyve output
+  cpus: 1                      # default vCPU count; per-VM override with `cpus:`
+  memory: 1G                   # default memory (Sizes format: 1G/512M); per-VM override with `memory:`
 
 vms:
   pod34:
@@ -56,7 +58,7 @@ A complete, self-consistent example set lives in [`examples/`](examples/):
 - [`inventory.yml`](examples/inventory.yml) — annotated inventory (a two-disk
   autostart VM, a cloud-init VM, and a commented-out installer-ISO VM)
 - [`pod.conf`](examples/pod.conf) — shared bhyve_config template; declares only
-  OS-core settings (cpus, memory, bootrom, hostbridge, rng, lpc console)
+  OS-core settings (bootrom, hostbridge, rng, lpc console, acpi flags)
 - [`user-data.yml`](examples/user-data.yml) — minimal NoCloud user-data
 
 ## Usage
@@ -101,10 +103,19 @@ block (`image_dir`, `root_size`, `root_from`):
     vmctl create db1     --network labs_vlan50 --disk data:200G                 # add a blank data disk
     vmctl create web1    --network labs_vlan50 --cloud-init ./web-userdata.yml --start
     vmctl create pod36   --network labs_vlan50 --iso /bhyve/isos/freebsd-14.3.iso --start
+    vmctl create db2     --network labs_vlan50 --cpus 4 --memory 8G                    # override cpus/memory defaults
 
-vmctl generates all device attachments from the inventory — templates declare
-OS-core settings only. There is no template/iso pairing requirement:
+vmctl generates cpus/memory and all device attachments from the inventory —
+templates declare OS-core settings only. There is no template/iso pairing
+requirement:
 
+- **CPU** (`cpus`) — generated from the VM's `cpus:` field, falling back to
+  `defaults.cpus` (1 if unset). Override at creation with `--cpus N`, or
+  change it later with `vmctl set <name> --cpus N`.
+- **Memory** (`memory.size`) — generated from the VM's `memory:` field
+  (`Sizes` format, e.g. `1G`/`512M`), falling back to `defaults.memory` (1G if
+  unset). Override at creation with `--memory SIZE`, or change it later with
+  `vmctl set <name> --memory SIZE`.
 - **Disks** (`pci.0.3.N`, max 8) — generated from the VM's `disks:` list.
 - **NICs** (`pci.0.4.N`) — generated from `network`/`link`/`mac` + `networks:`.
 - **Installer ISO** (`pci.0.5.0`) — generated when `iso:` is present; the ISO is
@@ -114,11 +125,12 @@ OS-core settings only. There is no template/iso pairing requirement:
   vmctl builds a NoCloud ISO (label "cidata") from the `user_data:` template and
   optional `vars:`.
 
-Templates must NOT declare `pci.0.3.*`, `pci.0.4.*`, `pci.0.5.*`, or `pci.0.6.*`
-devices — vmctl injects them all at start. At `start`, vmctl renders the
-fully-resolved config to `<run_dir>/<name>.conf` (ephemeral, regenerated every
-start — do not hand-edit) and launches `bhyve -k <run_dir>/<name>.conf <name>`.
-Per-VM `options:` in the inventory merge over the template; generated device keys
+Templates must NOT declare `cpus`, `memory.size`, `pci.0.3.*`, `pci.0.4.*`,
+`pci.0.5.*`, or `pci.0.6.*` — vmctl injects them all at start. At `start`,
+vmctl renders the fully-resolved config to `<run_dir>/<name>.conf` (ephemeral,
+regenerated every start — do not hand-edit) and launches
+`bhyve -k <run_dir>/<name>.conf <name>`. Per-VM `options:` in the inventory
+merge over the template; generated keys (including `cpus`/`memory.size`)
 always win.
 
 `import <name> --network NET` adopts a VM whose dataset already exists (e.g.
