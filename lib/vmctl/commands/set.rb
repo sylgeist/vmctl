@@ -17,6 +17,9 @@ module VMCtl
           p.on('--no-autostart') { opts[:autostart] = false }
           p.on('--graphics')     { opts[:graphics] = true }
           p.on('--no-graphics')  { opts[:graphics] = false }
+          p.on('--efi-vars')     { opts[:efi_vars] = true }
+          p.on('--no-efi-vars')  { opts[:efi_vars] = false }
+          p.on('--reset-efi-vars') { opts[:reset_efi_vars] = true }
           p.on('--network NET')  { |v| opts[:network] = v }
           p.on('--mtu N')        { |v| opts[:mtu] = v }
           p.on('--cpus N')      { |v| opts[:cpus] = v }
@@ -79,6 +82,13 @@ module VMCtl
           e.config = opts[:config]
           changed << "config=#{e.config}"
         end
+        if opts.key?(:efi_vars)
+          e.efi_vars = opts[:efi_vars]
+          changed << "efi_vars=#{e.efi_vars}"
+        end
+        if opts[:reset_efi_vars]
+          reset_efi_vars!(vm, changed)
+        end
         apply_iso!(vm, opts[:iso], changed) if opts.key?(:iso)
         apply_cloud_init!(vm, opts, changed) if opts.key?(:cloud_init) || opts.key?(:vars)
         changed
@@ -98,6 +108,12 @@ module VMCtl
       def validate_template!(tmpl)
         path = File.join(config.defaults.config_dir, tmpl)
         raise CommandError, "template not found: #{path}" unless File.exist?(path)
+      end
+
+      def reset_efi_vars!(vm, changed)
+        raise CommandError, "#{vm.name} does not have efi_vars enabled" unless vm.entry.efi_vars
+        executor.run('rm', '-f', vm.uefi_vars_path)
+        changed << 'efi_vars=reset'
       end
 
       def apply_iso!(vm, iso, changed)

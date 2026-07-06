@@ -136,11 +136,21 @@ requirement:
   `defaults.vnc_bind: 127.0.0.1` and reach it over an SSH tunnel instead:
   `ssh -L 5910:localhost:5910 <host>`, then point a VNC client at
   `localhost:5910`.
+- **Persistent UEFI vars** (`bootvars`) — generated when `efi_vars: true` is
+  set on a VM: a writable UEFI variables store, copied from the host's
+  pristine template (`defaults.uefi_vars_template`, default
+  `/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd`) into
+  `<vm_root>/<name>/<name>-uefi-vars.fd` on first start. Boot order and other
+  UEFI settings then persist across restarts. Default is `false`. Reset to
+  factory with `vmctl set <name> --reset-efi-vars` (removes the file; it's
+  recreated pristine on the next start); disable with `set --no-efi-vars`.
 
 Templates must NOT declare `cpus`, `memory.size`, `pci.0.3.*`, `pci.0.4.*`,
 `pci.0.5.*`, `pci.0.6.*`, or (when `graphics: true`) `pci.0.7.*`/`pci.0.8.*` —
-vmctl injects them all at start. At `start`,
-vmctl renders the fully-resolved config to `<run_dir>/<name>.conf` (ephemeral,
+vmctl injects them all at start. At `start`, vmctl first verifies the
+`bootrom` firmware file exists, failing fast with an install hint (install
+the `uefi-edk2-bhyve` package) if it does not, then
+renders the fully-resolved config to `<run_dir>/<name>.conf` (ephemeral,
 regenerated every start — do not hand-edit) and launches
 `bhyve -k <run_dir>/<name>.conf <name>`. Per-VM `options:` in the inventory
 merge over the template; generated keys (including `cpus`/`memory.size`)
