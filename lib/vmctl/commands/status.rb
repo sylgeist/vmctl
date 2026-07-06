@@ -9,10 +9,15 @@ module VMCtl
         all = args.delete('--all')
         vms = targets(args, all: all || args.empty?)
         vms.each do |vm|
-          state = vm.running?(executor) ? 'running' : 'stopped'
-          pid = vm.read_pid
-          pid_str = pid ? " pid #{pid}" : ''
-          puts "#{vm.name}: #{state}#{pid_str} (#{vm.entry.network} link #{vm.entry.link})"
+          net = "(#{vm.entry.network} link #{vm.entry.link})"
+          if !vm.running?(executor)
+            puts "#{vm.name}: stopped #{net}"
+          elsif vm.supervisor_alive?(executor)
+            puts "#{vm.name}: running pid #{vm.read_pid} #{net}"
+          else
+            puts "#{vm.name}: stale — vmm device with no live supervisor; " \
+                 "run 'vmctl stop --force #{vm.name}' #{net}"
+          end
         end
       end
     end

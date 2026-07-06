@@ -85,6 +85,18 @@ module VMCtl
       executor.success?('test', '-e', vmm_device)
     end
 
+    # A live supervisor: a pidfile whose pid is an existing process.
+    def supervisor_alive?(executor)
+      pid = read_pid
+      !!pid && executor.success?('kill', '-0', pid.to_s)
+    end
+
+    # The vmm device exists but nothing is supervising it (bhyve died without
+    # its supervisor running `bhyvectl --destroy`).
+    def stale?(executor)
+      running?(executor) && !supervisor_alive?(executor)
+    end
+
     def read_pid
       return nil unless File.exist?(pidfile)
       Integer(File.read(pidfile).strip)

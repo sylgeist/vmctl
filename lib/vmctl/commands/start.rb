@@ -27,7 +27,13 @@ module VMCtl
           puts "[dry-run] #{vm.bhyve_command}"
           return
         end
-        raise CommandError, "#{vm.name} already running" if vm.running?(executor)
+        if vm.running?(executor)
+          if vm.stale?(executor)
+            raise CommandError,
+                  "#{vm.name} has a stale vmm device — run 'vmctl stop --force #{vm.name}' first"
+          end
+          raise CommandError, "#{vm.name} already running"
+        end
         if vm.nic_count > 8
           raise CommandError, "#{vm.name} has #{vm.nic_count} NICs (max 8: pci.0.4.0-7)"
         end

@@ -7,11 +7,11 @@ require 'vmctl/config'
 require 'vmctl/vm'
 
 class TestVM < Minitest::Test
-  def defaults(config_dir: '/bhyve/configs')
+  def defaults(config_dir: '/bhyve/configs', run_dir: '/var/run/vmctl')
     VMCtl::Defaults.new(
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'pod.conf', link_base: 10,
-      run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl'
+      run_dir: run_dir, log_dir: '/var/log/vmctl'
     )
   end
 
@@ -88,5 +88,55 @@ class TestVM < Minitest::Test
     vm = VMCtl::VM.new(entry(network: 'none'), defaults)
     assert_equal [], vm.nic_bridges
     assert_equal 0, vm.nic_count
+  end
+
+  def test_supervisor_alive_true_when_pid_running
+    Dir.mktmpdir do |run|
+      File.write(File.join(run, 'pod34.pid'), '4242')
+      vm = VMCtl::VM.new(entry, defaults(run_dir: run))
+      exec = FakeExecutor.new(probes: { 'kill -0 4242' => true })
+      assert vm.supervisor_alive?(exec)
+    end
+  end
+
+  def test_supervisor_alive_false_when_no_pidfile
+    Dir.mktmpdir do |run|
+      vm = VMCtl::VM.new(entry, defaults(run_dir: run))
+      refute vm.supervisor_alive?(FakeExecutor.new)
+    end
+  end
+
+  def test_supervisor_alive_false_when_pid_dead
+    Dir.mktmpdir do |run|
+      File.write(File.join(run, 'pod34.pid'), '4242')
+      vm = VMCtl::VM.new(entry, defaults(run_dir: run))
+      exec = FakeExecutor.new(probes: { 'kill -0 4242' => false })
+      refute vm.supervisor_alive?(exec)
+    end
+  end
+
+  def test_stale_true_when_vmm_but_no_live_supervisor
+    Dir.mktmpdir do |run|
+      vm = VMCtl::VM.new(entry, defaults(run_dir: run))   # no pidfile
+      exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true })
+      assert vm.stale?(exec)
+    end
+  end
+
+  def test_stale_false_when_running_with_live_supervisor
+    Dir.mktmpdir do |run|
+      File.write(File.join(run, 'pod34.pid'), '4242')
+      vm = VMCtl::VM.new(entry, defaults(run_dir: run))
+      exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => true, 'kill -0 4242' => true })
+      refute vm.stale?(exec)
+    end
+  end
+
+  def test_stale_false_when_no_vmm_device
+    Dir.mktmpdir do |run|
+      vm = VMCtl::VM.new(entry, defaults(run_dir: run))
+      exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false })
+      refute vm.stale?(exec)
+    end
   end
 end
