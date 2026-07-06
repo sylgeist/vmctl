@@ -63,6 +63,14 @@ module VMCtl
       "/dev/nmdm#{@entry.link}B"
     end
 
+    def vnc_port
+      @defaults.vnc_base + @entry.link
+    end
+
+    def vnc_endpoint
+      "#{@defaults.vnc_bind}:#{vnc_port}"
+    end
+
     def disk_paths
       @entry.disks.map { |d| File.join(dir, d.file) }
     end
