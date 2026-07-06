@@ -167,4 +167,26 @@ class TestSetCommand < Minitest::Test
     err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--cloud-init', 'nope.yml']) }
     assert_match(/cloud-init template not found/, err.message)
   end
+
+  def test_set_cpus
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--cpus', '4']) }
+    assert_equal 4, VMCtl::Config.load(@inv).vms.fetch('pod34').cpus
+  end
+
+  def test_set_memory
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--memory', '2G']) }
+    assert_equal '2G', VMCtl::Config.load(@inv).vms.fetch('pod34').memory
+  end
+
+  def test_set_rejects_bad_cpus
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--cpus', 'x']) }
+  end
+
+  def test_set_rejects_bad_memory
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--memory', '1GB']) }
+  end
 end

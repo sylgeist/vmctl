@@ -17,6 +17,8 @@ module VMCtl
           p.on('--no-autostart') { opts[:autostart] = false }
           p.on('--network NET')  { |v| opts[:network] = v }
           p.on('--mtu N')        { |v| opts[:mtu] = v }
+          p.on('--cpus N')      { |v| opts[:cpus] = v }
+          p.on('--memory SIZE') { |v| opts[:memory] = v }
           p.on('--mac MAC')      { |v| opts[:mac] = v }
           p.on('--config TMPL')  { |v| opts[:config] = v }
           p.on('--iso FILE')     { |v| opts[:iso] = v }
@@ -53,6 +55,14 @@ module VMCtl
         if opts.key?(:mtu)
           e.mtu = parse_mtu(opts[:mtu])
           changed << "mtu=#{e.mtu}"
+        end
+        if opts.key?(:cpus)
+          e.cpus = positive_int!(opts[:cpus], '--cpus')
+          changed << "cpus=#{e.cpus}"
+        end
+        if opts.key?(:memory)
+          e.memory = valid_size!(opts[:memory], '--memory')
+          changed << "memory=#{e.memory}"
         end
         if opts.key?(:mac)
           e.mac = resolve_mac(opts[:mac], vm.name)
