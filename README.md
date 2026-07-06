@@ -144,6 +144,14 @@ requirement:
   UEFI settings then persist across restarts. Default is `false`. Reset to
   factory with `vmctl set <name> --reset-efi-vars` (removes the file; it's
   recreated pristine on the next start); disable with `set --no-efi-vars`.
+- **RTC time base** (`rtc.use_localtime`) — `rtc_localtime` sets whether a VM's
+  real-time clock uses localtime (bhyve default) or UTC. Per-VM, with a
+  `defaults.rtc_localtime` fallback (default `true` = localtime). For a UTC
+  homelab set `defaults.rtc_localtime: false` once; Linux/BSD guests generally
+  want UTC.
+- **Wired memory** (`memory.wired`) — `memory_wired: true` pins the VM's guest
+  memory so the host won't swap it out (latency/perf-sensitive VMs). Per-VM
+  opt-in; default off.
 
 Templates must NOT declare `cpus`, `memory.size`, `pci.0.3.*`, `pci.0.4.*`,
 `pci.0.5.*`, `pci.0.6.*`, or (when `graphics: true`) `pci.0.7.*`/`pci.0.8.*` —

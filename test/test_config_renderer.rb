@@ -12,18 +12,20 @@ class TestConfigRenderer < Minitest::Test
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'base.conf', link_base: 10,
       run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
-      cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0'
+      cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0',
+      rtc_localtime: true
     )
   end
 
   def entry(disks:, mac: nil, iso: nil, cloud_init: nil, options: {}, config: 'base.conf',
             network: 'labs_vlan50', mtu: nil, networks: [], cpus: nil, memory: nil,
-            graphics: false, efi_vars: false)
+            graphics: false, efi_vars: false, rtc_localtime: nil, memory_wired: false)
     VMCtl::VMEntry.new(
       name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true, disks: disks, cloud_init: cloud_init, iso: iso,
       options: options, mtu: mtu, networks: networks, cpus: cpus, memory: memory,
-      graphics: graphics, efi_vars: efi_vars
+      graphics: graphics, efi_vars: efi_vars, rtc_localtime: rtc_localtime,
+      memory_wired: memory_wired
     )
   end
 
@@ -87,7 +89,7 @@ class TestConfigRenderer < Minitest::Test
 
   def test_output_is_sorted
     out = render("zeta=1\nalpha=2\n", entry(disks: [], network: 'none'))
-    assert_equal %w[alpha=2 cpus=1 memory.size=1G zeta=1], out.split("\n")
+    assert_equal %w[alpha=2 cpus=1 memory.size=1G rtc.use_localtime=true zeta=1], out.split("\n")
   end
 
   def test_iso_substituted_when_set
@@ -231,7 +233,8 @@ class TestConfigRenderer < Minitest::Test
         config_dir: dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
         template: 'base.conf', link_base: 10,
         run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
-        cpus: 1, memory: '1G', vnc_base: 6000, vnc_bind: '127.0.0.1'
+        cpus: 1, memory: '1G', vnc_base: 6000, vnc_bind: '127.0.0.1',
+        rtc_localtime: true
       )
       vm = VMCtl::VM.new(e, d)
       out = VMCtl::ConfigRenderer.new(d).render(vm)
@@ -274,6 +277,42 @@ class TestConfigRenderer < Minitest::Test
       assert_equal '1', map['cpus']                      # generator overrides flavor
       assert_equal '/bhyve/pod34/pod34-root.raw', map['pci.0.3.0.path']
     end
+  end
+
+  def test_rtc_localtime_defaults_to_true
+    out = render("cpus=2\n", entry(disks: []))               # entry rtc nil -> default true
+    assert_match(/^rtc\.use_localtime=true$/, out)
+  end
+
+  def test_rtc_localtime_entry_false_is_honored
+    out = render("cpus=2\n", entry(disks: [], rtc_localtime: false))
+    assert_match(/^rtc\.use_localtime=false$/, out)          # explicit false, not the default
+    refute_match(/^rtc\.use_localtime=true$/, out)
+  end
+
+  def test_rtc_localtime_falls_back_to_defaults_false
+    # entry nil, but defaults say localtime=false -> renders false
+    Dir.mktmpdir do |dir|
+      e = entry(disks: [])
+      File.write(File.join(dir, e.config), "cpus=2\n")
+      d = VMCtl::Defaults.new(
+        config_dir: dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
+        template: 'base.conf', link_base: 10,
+        run_dir: '/var/run/vmctl', log_dir: '/var/log/vmctl',
+        cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0',
+        rtc_localtime: false
+      )
+      vm = VMCtl::VM.new(e, d)
+      out = VMCtl::ConfigRenderer.new(d).render(vm)
+      assert_match(/^rtc\.use_localtime=false$/, out)
+    end
+  end
+
+  def test_memory_wired_emitted_only_when_true
+    on  = render("cpus=2\n", entry(disks: [], memory_wired: true))
+    off = render("cpus=2\n", entry(disks: []))
+    assert_match(/^memory\.wired=true$/, on)
+    refute_match(/^memory\.wired=/, off)
   end
 
   def test_render_equals_serialized_resolve

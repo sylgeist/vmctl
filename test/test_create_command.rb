@@ -280,6 +280,24 @@ class TestCreateCommand < Minitest::Test
     assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod35').efi_vars
   end
 
+  def test_create_rtc_and_wired_flags
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50', '--no-rtc-localtime', '--memory-wired']) }
+    e = VMCtl::Config.load(@inv).vms.fetch('pod35')
+    assert_equal false, e.rtc_localtime
+    assert_equal true, e.memory_wired
+  end
+
+  def test_create_without_tuning_flags_leaves_defaults
+    exec = bridge_ok
+    cmd = VMCtl::Commands::Create.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod35', '--network', 'labs_vlan50']) }
+    e = VMCtl::Config.load(@inv).vms.fetch('pod35')
+    assert_nil e.rtc_localtime          # inherit default at render
+    assert_equal false, e.memory_wired
+  end
+
   def test_create_network_none_skips_bridge_and_succeeds
     # If create wrongly probed a 'none' bridge, this false probe would make it
     # raise; success proves the primary-bridge check is skipped for `none`.

@@ -252,4 +252,24 @@ class TestSetCommand < Minitest::Test
     err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', '--reset-efi-vars']) }
     assert_match(/does not have efi_vars/, err.message)
   end
+
+  def test_set_no_rtc_localtime
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--no-rtc-localtime']) }
+    assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod34').rtc_localtime
+  end
+
+  def test_set_rtc_localtime_true
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--rtc-localtime']) }
+    assert_equal true, VMCtl::Config.load(@inv).vms.fetch('pod34').rtc_localtime
+  end
+
+  def test_set_memory_wired_toggle
+    cmd = VMCtl::Commands::Set.new(config: cfg, executor: stopped)
+    capture_stdout { cmd.call(['pod34', '--memory-wired']) }
+    assert_equal true, VMCtl::Config.load(@inv).vms.fetch('pod34').memory_wired
+    capture_stdout { cmd.call(['pod34', '--no-memory-wired']) }
+    assert_equal false, VMCtl::Config.load(@inv).vms.fetch('pod34').memory_wired
+  end
 end

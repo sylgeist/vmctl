@@ -45,7 +45,7 @@ module VMCtl
     def generators
       [method(:disk_keys), method(:net_keys), method(:iso_cd_keys),
        method(:seed_cd_keys), method(:hardware_keys), method(:graphics_keys),
-       method(:firmware_keys)]
+       method(:firmware_keys), method(:tuning_keys)]
     end
 
     # CPU/memory from the inventory (entry, falling back to defaults).
@@ -78,6 +78,18 @@ module VMCtl
     def firmware_keys(vm)
       return {} unless vm.entry.efi_vars
       { 'bootvars' => vm.uefi_vars_path }
+    end
+
+    # Guest tuning: RTC time base (always emitted; entry overrides the default)
+    # and optional wired guest memory. NOTE: rtc uses a .nil? check, not ||, so an
+    # explicit false is honored rather than falling back to the default.
+    def tuning_keys(vm)
+      e = vm.entry
+      keys = {}
+      lt = e.rtc_localtime.nil? ? @defaults.rtc_localtime : e.rtc_localtime
+      keys['rtc.use_localtime'] = lt.to_s
+      keys['memory.wired'] = 'true' if e.memory_wired
+      keys
     end
 
     def disk_keys(vm)
