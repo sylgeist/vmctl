@@ -10,13 +10,13 @@ module VMCtl
   Defaults = Struct.new(
     :config_dir, :vm_root, :zpool, :template, :link_base, :run_dir, :log_dir,
     :image_dir, :root_size, :root_from, :cpus, :memory, :vnc_base, :vnc_bind,
-    :uefi_vars_template, :rtc_localtime,
+    :uefi_vars_template, :rtc_localtime, :smbios,
     keyword_init: true
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
     :options, :mtu, :networks, :cpus, :memory, :graphics, :efi_vars,
-    :rtc_localtime, :memory_wired,
+    :rtc_localtime, :memory_wired, :smbios,
     keyword_init: true
   )
   Nic = Struct.new(:bridge, :mtu, :mac, keyword_init: true)
@@ -50,8 +50,11 @@ module VMCtl
       'vnc_base'   => 5900,
       'vnc_bind'   => '0.0.0.0',
       'uefi_vars_template' => '/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd',
-      'rtc_localtime' => true
+      'rtc_localtime' => true,
+      'smbios' => {}
     }.freeze
+
+    SMBIOS_PREFIXES = %w[bios. system. board. chassis.].freeze
 
     attr_reader :defaults, :vms, :path
 
@@ -125,7 +128,8 @@ module VMCtl
         vnc_base:   parse_vnc_base(merged['vnc_base']),
         vnc_bind:   merged['vnc_bind'],
         uefi_vars_template: merged['uefi_vars_template'],
-        rtc_localtime: merged['rtc_localtime']
+        rtc_localtime: merged['rtc_localtime'],
+        smbios: parse_smbios(merged['smbios'])
       )
     end
 
@@ -156,7 +160,8 @@ module VMCtl
         graphics:   body.fetch('graphics', false),
         efi_vars:   body.fetch('efi_vars', false),
         rtc_localtime: body.key?('rtc_localtime') ? body['rtc_localtime'] : nil,
-        memory_wired:  body.fetch('memory_wired', false)
+        memory_wired:  body.fetch('memory_wired', false),
+        smbios:        parse_smbios(body['smbios'])
       )
     end
 
@@ -184,6 +189,19 @@ module VMCtl
       h ||= {}
       raise ConfigError, "'options' must be a mapping" unless h.is_a?(Hash)
       h
+    end
+
+    def parse_smbios(v)
+      return {} if v.nil?
+      raise ConfigError, "'smbios' must be a mapping" unless v.is_a?(Hash)
+      v.each_with_object({}) do |(k, val), h|
+        key = k.to_s
+        unless SMBIOS_PREFIXES.any? { |p| key.start_with?(p) && key.length > p.length }
+          raise ConfigError,
+                "invalid smbios key '#{key}' (must be one of bios./system./board./chassis.*)"
+        end
+        h[key] = val.to_s
+      end
     end
 
     def parse_cpus(v)
@@ -241,6 +259,7 @@ module VMCtl
       h['efi_vars'] = true if vm.efi_vars
       h['rtc_localtime'] = vm.rtc_localtime unless vm.rtc_localtime.nil?
       h['memory_wired'] = true if vm.memory_wired
+      h['smbios'] = vm.smbios unless vm.smbios.nil? || vm.smbios.empty?
       h['mtu'] = vm.mtu unless vm.mtu.nil?
       h['networks'] = vm.networks.map { |n| compact_nic(n) } unless vm.networks.nil? || vm.networks.empty?
       h

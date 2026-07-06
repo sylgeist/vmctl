@@ -152,6 +152,14 @@ requirement:
 - **Wired memory** (`memory.wired`) — `memory_wired: true` pins the VM's guest
   memory so the host won't swap it out (latency/perf-sensitive VMs). Per-VM
   opt-in; default off.
+- **SMBIOS identity** (`bios.*`/`system.*`/`board.*`/`chassis.*`) —
+  `defaults.smbios` is a flat map of bhyve SMBIOS keys applied to every VM
+  (consistent homelab hardware identity: manufacturer, product name, etc.). A
+  per-VM `smbios:` map overrides or adds keys for a single VM (e.g. a unique
+  `system.serial_number` / `chassis.asset_tag`). Keys must be in the
+  `bios.`/`system.`/`board.`/`chassis.` namespaces. Layering:
+  `defaults.smbios` < per-VM `smbios` < per-VM `options:`. Edited in the
+  inventory YAML (no CLI).
 
 Templates must NOT declare `cpus`, `memory.size`, `pci.0.3.*`, `pci.0.4.*`,
 `pci.0.5.*`, `pci.0.6.*`, or (when `graphics: true`) `pci.0.7.*`/`pci.0.8.*` —
