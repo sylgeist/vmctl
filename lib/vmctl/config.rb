@@ -10,12 +10,13 @@ module VMCtl
   Defaults = Struct.new(
     :config_dir, :vm_root, :zpool, :template, :link_base, :run_dir, :log_dir,
     :image_dir, :root_size, :root_from, :cpus, :memory, :vnc_base, :vnc_bind,
-    :uefi_vars_template,
+    :uefi_vars_template, :rtc_localtime,
     keyword_init: true
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
     :options, :mtu, :networks, :cpus, :memory, :graphics, :efi_vars,
+    :rtc_localtime, :memory_wired,
     keyword_init: true
   )
   Nic = Struct.new(:bridge, :mtu, :mac, keyword_init: true)
@@ -48,7 +49,8 @@ module VMCtl
       'memory'     => '1G',
       'vnc_base'   => 5900,
       'vnc_bind'   => '0.0.0.0',
-      'uefi_vars_template' => '/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd'
+      'uefi_vars_template' => '/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd',
+      'rtc_localtime' => true
     }.freeze
 
     attr_reader :defaults, :vms, :path
@@ -122,7 +124,8 @@ module VMCtl
         memory:     parse_memory(merged['memory']),
         vnc_base:   parse_vnc_base(merged['vnc_base']),
         vnc_bind:   merged['vnc_bind'],
-        uefi_vars_template: merged['uefi_vars_template']
+        uefi_vars_template: merged['uefi_vars_template'],
+        rtc_localtime: merged['rtc_localtime']
       )
     end
 
@@ -151,7 +154,9 @@ module VMCtl
         cpus:       parse_cpus(body['cpus']),
         memory:     parse_memory(body['memory']),
         graphics:   body.fetch('graphics', false),
-        efi_vars:   body.fetch('efi_vars', false)
+        efi_vars:   body.fetch('efi_vars', false),
+        rtc_localtime: body.key?('rtc_localtime') ? body['rtc_localtime'] : nil,
+        memory_wired:  body.fetch('memory_wired', false)
       )
     end
 
@@ -234,6 +239,8 @@ module VMCtl
       h['memory'] = vm.memory unless vm.memory.nil?
       h['graphics'] = true if vm.graphics
       h['efi_vars'] = true if vm.efi_vars
+      h['rtc_localtime'] = vm.rtc_localtime unless vm.rtc_localtime.nil?
+      h['memory_wired'] = true if vm.memory_wired
       h['mtu'] = vm.mtu unless vm.mtu.nil?
       h['networks'] = vm.networks.map { |n| compact_nic(n) } unless vm.networks.nil? || vm.networks.empty?
       h

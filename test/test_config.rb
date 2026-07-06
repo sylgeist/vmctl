@@ -483,4 +483,59 @@ class TestConfig < Minitest::Test
     refute h['vms']['e2'].key?('efi_vars'), 'efi_vars omitted when false'
     f.close
   end
+
+  def test_rtc_localtime_default_true
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal true, cfg.defaults.rtc_localtime
+    f.close
+  end
+
+  def test_rtc_localtime_default_override
+    f = write_inventory("defaults: { rtc_localtime: false }\nvms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal false, cfg.defaults.rtc_localtime
+    f.close
+  end
+
+  def test_vm_rtc_localtime_parsed_nil_when_absent
+    f = write_inventory(<<~YAML)
+      vms:
+        a: { network: n, link: 10, rtc_localtime: false }
+        b: { network: n, link: 11, rtc_localtime: true }
+        c: { network: n, link: 12 }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal false, cfg.vms.fetch('a').rtc_localtime
+    assert_equal true, cfg.vms.fetch('b').rtc_localtime
+    assert_nil cfg.vms.fetch('c').rtc_localtime
+    f.close
+  end
+
+  def test_memory_wired_parsed_and_defaults_false
+    f = write_inventory(<<~YAML)
+      vms:
+        a: { network: n, link: 10, memory_wired: true }
+        b: { network: n, link: 11 }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal true, cfg.vms.fetch('a').memory_wired
+    assert_equal false, cfg.vms.fetch('b').memory_wired
+    f.close
+  end
+
+  def test_tuning_fields_round_trip
+    f = write_inventory(<<~YAML)
+      vms:
+        a: { network: n, link: 10, rtc_localtime: false, memory_wired: true, disks: [] }
+        b: { network: n, link: 11, disks: [] }
+    YAML
+    cfg = VMCtl::Config.load(f.path)
+    h = cfg.to_h
+    assert_equal false, h['vms']['a']['rtc_localtime']  # false still emitted (non-nil)
+    assert_equal true, h['vms']['a']['memory_wired']
+    refute h['vms']['b'].key?('rtc_localtime'), 'rtc_localtime omitted when unset'
+    refute h['vms']['b'].key?('memory_wired'), 'memory_wired omitted when false'
+    f.close
+  end
 end
