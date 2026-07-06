@@ -245,4 +245,28 @@ class TestConfigRenderer < Minitest::Test
     assert_match(/^pci\.0\.7\.0\.device=fbuf$/, out)
     refute_match(/evil/, out)
   end
+
+  def test_resolve_returns_key_map
+    e = entry(disks: [VMCtl::Disk.new(file: 'pod34-root.raw', size: '20G', from: nil)])
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, e.config), "bootrom=/fw/X.fd\ncpus=9\n")
+      d = defaults(dir)
+      map = VMCtl::ConfigRenderer.new(d).resolve(VMCtl::VM.new(e, d))
+      assert_instance_of Hash, map
+      assert_equal '/fw/X.fd', map['bootrom']
+      assert_equal '1', map['cpus']                      # generator overrides flavor
+      assert_equal '/bhyve/pod34/pod34-root.raw', map['pci.0.3.0.path']
+    end
+  end
+
+  def test_render_equals_serialized_resolve
+    e = entry(disks: [])
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, e.config), "zeta=1\nalpha=2\n")
+      d = defaults(dir)
+      r = VMCtl::ConfigRenderer.new(d)
+      vm = VMCtl::VM.new(e, d)
+      assert_equal r.serialize(r.resolve(vm)), r.render(vm)
+    end
+  end
 end

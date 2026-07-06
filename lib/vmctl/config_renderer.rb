@@ -17,12 +17,23 @@ module VMCtl
 
     # vm: a VMCtl::VM. Returns the resolved config as a String.
     def render(vm)
+      serialize(resolve(vm))
+    end
+
+    # Returns the fully merged/generated key map (before serialization):
+    # flavor %()-substituted -> options: -> generators (generators win).
+    def resolve(vm)
       # Read as binary: flavor comments may hold non-ASCII bytes and the host
       # may run under LANG=C; the scan/substitution must not raise on them.
       text = File.binread(vm.template_path)
       map = parse_pairs(substitute(text, vm.entry))
       stringify(vm.entry.options).each { |k, v| map[k] = v }
       generators.each { |gen| gen.call(vm).each { |k, v| map[k] = v } }
+      map
+    end
+
+    # Serialize a resolved key map to bhyve_config text (sorted, k=v per line).
+    def serialize(map)
       map.sort.map { |k, v| "#{k}=#{v}" }.join("\n") + "\n"
     end
 

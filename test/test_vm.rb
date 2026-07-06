@@ -151,4 +151,19 @@ class TestVM < Minitest::Test
     vm = VMCtl::VM.new(entry, defaults)
     assert_equal '0.0.0.0:5910', vm.vnc_endpoint
   end
+
+  def test_resolved_config_is_a_map
+    Dir.mktmpdir do |dir|
+      cfgdir = File.join(dir, 'configs'); FileUtils.mkdir_p(cfgdir)
+      File.write(File.join(cfgdir, 'pod.conf'), "bootrom=/fw/Y.fd\ncpus=9\n")
+      d = VMCtl::Defaults.new(
+        config_dir: cfgdir, vm_root: '/bhyve', zpool: 'tank/bhyve',
+        template: 'pod.conf', link_base: 10, run_dir: File.join(dir, 'run'),
+        log_dir: '/l', cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0'
+      )
+      vm = VMCtl::VM.new(entry, d)
+      assert_equal '/fw/Y.fd', vm.resolved_config['bootrom']
+      assert_equal '1', vm.resolved_config['cpus']
+    end
+  end
 end

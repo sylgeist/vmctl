@@ -21,8 +21,12 @@ module VMCtl
       File.join(@defaults.run_dir, "#{name}.conf")
     end
 
+    def resolved_config
+      @resolved_config ||= ConfigRenderer.new(@defaults).resolve(self)
+    end
+
     def render_config
-      ConfigRenderer.new(@defaults).render(self)
+      ConfigRenderer.new(@defaults).serialize(resolved_config)
     end
 
     def write_config
