@@ -196,7 +196,7 @@ module VMCtl
       raise ConfigError, "'smbios' must be a mapping" unless v.is_a?(Hash)
       v.each_with_object({}) do |(k, val), h|
         key = k.to_s
-        unless SMBIOS_PREFIXES.any? { |p| key.start_with?(p) }
+        unless SMBIOS_PREFIXES.any? { |p| key.start_with?(p) && key.length > p.length }
           raise ConfigError,
                 "invalid smbios key '#{key}' (must be one of bios./system./board./chassis.*)"
         end

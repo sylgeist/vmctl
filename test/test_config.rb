@@ -578,6 +578,19 @@ class TestConfig < Minitest::Test
     f.close
   end
 
+  def test_smbios_rejects_bare_prefix_key
+    # A namespace prefix with no suffix (e.g. "system.") is degenerate — reject it.
+    f = write_inventory(<<~YAML)
+      defaults:
+        smbios:
+          system.: MyLab
+      vms: {}
+    YAML
+    err = assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(f.path) }
+    assert_match(/invalid smbios key/, err.message)
+    f.close
+  end
+
   def test_vm_smbios_parsed_and_bad_namespace_rejected
     ok = write_inventory(<<~YAML)
       vms:
