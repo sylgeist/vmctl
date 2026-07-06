@@ -142,6 +142,11 @@ class TestVM < Minitest::Test
     end
   end
 
+  def test_uefi_vars_path
+    vm = VMCtl::VM.new(entry, defaults)
+    assert_equal '/bhyve/pod34/pod34-uefi-vars.fd', vm.uefi_vars_path
+  end
+
   def test_vnc_port_is_base_plus_link
     vm = VMCtl::VM.new(entry, defaults)   # link 10
     assert_equal 5910, vm.vnc_port

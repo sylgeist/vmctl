@@ -18,12 +18,12 @@ class TestConfigRenderer < Minitest::Test
 
   def entry(disks:, mac: nil, iso: nil, cloud_init: nil, options: {}, config: 'base.conf',
             network: 'labs_vlan50', mtu: nil, networks: [], cpus: nil, memory: nil,
-            graphics: false)
+            graphics: false, efi_vars: false)
     VMCtl::VMEntry.new(
       name: 'pod34', config: config, network: network, link: 10,
       mac: mac, autostart: true, disks: disks, cloud_init: cloud_init, iso: iso,
       options: options, mtu: mtu, networks: networks, cpus: cpus, memory: memory,
-      graphics: graphics
+      graphics: graphics, efi_vars: efi_vars
     )
   end
 
@@ -244,6 +244,16 @@ class TestConfigRenderer < Minitest::Test
     out = render("cpus=2\n", e)
     assert_match(/^pci\.0\.7\.0\.device=fbuf$/, out)
     refute_match(/evil/, out)
+  end
+
+  def test_no_bootvars_when_efi_vars_disabled
+    out = render("cpus=2\n", entry(disks: []))
+    refute_match(/^bootvars=/, out)
+  end
+
+  def test_bootvars_generated_when_efi_vars_enabled
+    out = render("cpus=2\n", entry(disks: [], efi_vars: true))
+    assert_match(%r{^bootvars=/bhyve/pod34/pod34-uefi-vars\.fd$}, out)
   end
 
   def test_resolve_returns_key_map

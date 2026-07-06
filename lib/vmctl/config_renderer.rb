@@ -44,7 +44,8 @@ module VMCtl
     # generator here -- no other change is required.
     def generators
       [method(:disk_keys), method(:net_keys), method(:iso_cd_keys),
-       method(:seed_cd_keys), method(:hardware_keys), method(:graphics_keys)]
+       method(:seed_cd_keys), method(:hardware_keys), method(:graphics_keys),
+       method(:firmware_keys)]
     end
 
     # CPU/memory from the inventory (entry, falling back to defaults).
@@ -68,6 +69,13 @@ module VMCtl
         'pci.0.8.0.device'        => 'xhci',
         'pci.0.8.0.slot.1.device' => 'tablet'
       }
+    end
+
+    # Persistent UEFI variables store, generated when efi_vars: true. The file is
+    # provisioned lazily at start (copied from the pristine host template).
+    def firmware_keys(vm)
+      return {} unless vm.entry.efi_vars
+      { 'bootvars' => vm.uefi_vars_path }
     end
 
     def disk_keys(vm)

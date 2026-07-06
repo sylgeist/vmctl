@@ -79,6 +79,10 @@ module VMCtl
       @entry.disks.map { |d| File.join(dir, d.file) }
     end
 
+    def uefi_vars_path
+      File.join(dir, "#{name}-uefi-vars.fd")
+    end
+
     # Bridges that must exist for this VM (primary unless `none`/nil, plus each
     # additional NIC). Used for start/create validation.
     def nic_bridges
