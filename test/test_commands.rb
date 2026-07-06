@@ -193,7 +193,7 @@ class TestStartCommand < Minitest::Test
                                      supervisor_factory: factory)
     capture_stdout { cmd.call(['pod34']) }
     written = File.read(File.join(run_dir, 'pod34.conf'))
-    assert_match(/^cpus=2$/, written)
+    assert_match(/^cpus=1$/, written)
     assert_match(%r{^pci\.0\.3\.0\.path=/bhyve/pod34/pod34-root\.raw$}, written)
   end
 

@@ -24,6 +24,7 @@ class TestDumpCommand < Minitest::Test
           config: #{config}
           network: labs_vlan50
           link: 10
+          memory: 4G
           disks: [{ file: pod34-root.raw, size: 20G }]
     YAML
     f = Tempfile.new(['inv', '.yml'])

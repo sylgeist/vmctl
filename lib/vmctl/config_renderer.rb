@@ -32,7 +32,16 @@ module VMCtl
     # the net block / iso CD / cloud-init seed to generated wiring later, append a
     # generator here -- no other change is required.
     def generators
-      [method(:disk_keys), method(:net_keys), method(:iso_cd_keys), method(:seed_cd_keys)]
+      [method(:disk_keys), method(:net_keys), method(:iso_cd_keys),
+       method(:seed_cd_keys), method(:hardware_keys)]
+    end
+
+    # CPU/memory from the inventory (entry, falling back to defaults).
+    def hardware_keys(vm)
+      {
+        'cpus'        => (vm.entry.cpus   || @defaults.cpus).to_s,
+        'memory.size' => (vm.entry.memory || @defaults.memory).to_s
+      }
     end
 
     def disk_keys(vm)
