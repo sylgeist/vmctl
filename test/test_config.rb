@@ -338,4 +338,59 @@ class TestConfig < Minitest::Test
     inv = "vms:\n  p:\n    network: n\n    link: 10\n    disks: []\n    cloud_init: { user_data: u, vars: 5 }\n"
     assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv).path) }
   end
+
+  def test_defaults_cpus_and_memory_fallback
+    f = write_inventory("vms: {}\n")
+    cfg = VMCtl::Config.load(f.path)
+    assert_equal 1, cfg.defaults.cpus
+    assert_equal '1G', cfg.defaults.memory
+    f.close
+  end
+
+  def test_defaults_cpus_and_memory_override
+    inv = "defaults: { cpus: 4, memory: 8G }\nvms: {}\n"
+    cfg = VMCtl::Config.load(write_inventory(inv).path)
+    assert_equal 4, cfg.defaults.cpus
+    assert_equal '8G', cfg.defaults.memory
+  end
+
+  def test_vm_cpus_and_memory_parse_and_roundtrip
+    inv = <<~YAML
+      defaults: { config_dir: /c, vm_root: /v, zpool: tank, link_base: 10 }
+      vms:
+        pod34: { network: n, link: 10, disks: [], cpus: 2, memory: 4G }
+    YAML
+    cfg = VMCtl::Config.load(write_inventory(inv).path)
+    vm = cfg.vms.fetch('pod34')
+    assert_equal 2, vm.cpus
+    assert_equal '4G', vm.memory
+    out = Tempfile.new(['out', '.yml']); cfg.save(out.path)
+    r = VMCtl::Config.load(out.path).vms.fetch('pod34')
+    assert_equal 2, r.cpus
+    assert_equal '4G', r.memory
+    out.close
+  end
+
+  def test_vm_cpus_and_memory_absent_not_emitted
+    f = write_inventory(VALID_INVENTORY)
+    cfg = VMCtl::Config.load(f.path)
+    assert_nil cfg.vms.fetch('pod34').cpus
+    out = Tempfile.new(['out', '.yml']); cfg.save(out.path)
+    body = File.read(out.path)
+    refute_match(/cpus:/, body)
+    refute_match(/memory:/, body)
+    f.close; out.close
+  end
+
+  def test_bad_cpus_raises
+    inv = "vms:\n  p: { network: n, link: 10, disks: [], cpus: 0 }\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv).path) }
+    inv2 = "vms:\n  p: { network: n, link: 10, disks: [], cpus: nope }\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv2).path) }
+  end
+
+  def test_bad_memory_raises
+    inv = "vms:\n  p: { network: n, link: 10, disks: [], memory: 1GB }\n"
+    assert_raises(VMCtl::ConfigError) { VMCtl::Config.load(write_inventory(inv).path) }
+  end
 end

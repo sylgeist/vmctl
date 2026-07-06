@@ -2,18 +2,19 @@
 # lib/vmctl/config.rb
 require 'yaml'
 require 'tempfile'
+require_relative 'sizes'
 
 module VMCtl
   class ConfigError < StandardError; end
 
   Defaults = Struct.new(
     :config_dir, :vm_root, :zpool, :template, :link_base, :run_dir, :log_dir,
-    :image_dir, :root_size, :root_from,
+    :image_dir, :root_size, :root_from, :cpus, :memory,
     keyword_init: true
   )
   VMEntry = Struct.new(
     :name, :config, :network, :link, :mac, :autostart, :disks, :cloud_init, :iso,
-    :options, :mtu, :networks,
+    :options, :mtu, :networks, :cpus, :memory,
     keyword_init: true
   )
   Nic = Struct.new(:bridge, :mtu, :mac, keyword_init: true)
@@ -41,7 +42,9 @@ module VMCtl
       'log_dir'    => '/var/log/vmctl',
       'image_dir'  => '/bhyve/images',
       'root_size'  => '20G',
-      'root_from'  => nil
+      'root_from'  => nil,
+      'cpus'       => 1,
+      'memory'     => '1G'
     }.freeze
 
     attr_reader :defaults, :vms, :path
@@ -82,8 +85,12 @@ module VMCtl
     end
 
     def to_h
+      defaults_h = @defaults.to_h
+      # Only include defaults that differ from DEFAULTS
+      defaults_h = defaults_h.select { |k, v| DEFAULTS[k.to_s] != v }
+      defaults_h = defaults_h.transform_keys(&:to_s)
       {
-        'defaults' => @defaults.to_h.transform_keys(&:to_s),
+        'defaults' => defaults_h,
         'vms' => @vms.transform_values { |vm| vm_to_h(vm) }
       }
     end
@@ -106,7 +113,9 @@ module VMCtl
         log_dir:    merged['log_dir'],
         image_dir:  merged['image_dir'],
         root_size:  merged['root_size'],
-        root_from:  merged['root_from']
+        root_from:  merged['root_from'],
+        cpus:       parse_cpus(merged['cpus']),
+        memory:     parse_memory(merged['memory'])
       )
     end
 
@@ -131,7 +140,9 @@ module VMCtl
         iso:        body['iso'],
         options:    parse_options(body.fetch('options', {})),
         mtu:        body['mtu'],
-        networks:   parse_networks(body.fetch('networks', []))
+        networks:   parse_networks(body.fetch('networks', [])),
+        cpus:       parse_cpus(body['cpus']),
+        memory:     parse_memory(body['memory'])
       )
     end
 
@@ -153,6 +164,21 @@ module VMCtl
       h ||= {}
       raise ConfigError, "'options' must be a mapping" unless h.is_a?(Hash)
       h
+    end
+
+    def parse_cpus(v)
+      return nil if v.nil?
+      n = Integer(v, exception: false)
+      raise ConfigError, "'cpus' must be a positive integer, got: #{v.inspect}" if n.nil? || n <= 0
+      n
+    end
+
+    def parse_memory(v)
+      return nil if v.nil?
+      Sizes.parse(v)   # validates format; raises ArgumentError on bad input
+      v.to_s
+    rescue ArgumentError
+      raise ConfigError, "'memory' must be a size like 1G/512M, got: #{v.inspect}"
     end
 
     def parse_networks(list)
@@ -189,6 +215,8 @@ module VMCtl
       h['cloud_init'] = vm.cloud_init if vm.cloud_init
       h['iso'] = vm.iso if vm.iso
       h['options'] = vm.options unless vm.options.nil? || vm.options.empty?
+      h['cpus'] = vm.cpus unless vm.cpus.nil?
+      h['memory'] = vm.memory unless vm.memory.nil?
       h['mtu'] = vm.mtu unless vm.mtu.nil?
       h['networks'] = vm.networks.map { |n| compact_nic(n) } unless vm.networks.nil? || vm.networks.empty?
       h
