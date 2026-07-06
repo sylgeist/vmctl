@@ -12,7 +12,7 @@ class TestVM < Minitest::Test
       config_dir: config_dir, vm_root: '/bhyve', zpool: 'tank/bhyve',
       template: 'pod.conf', link_base: 10,
       run_dir: run_dir, log_dir: '/var/log/vmctl',
-      cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0'
+      cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0', rtc_localtime: true
     )
   end
 
@@ -49,7 +49,7 @@ class TestVM < Minitest::Test
       d = VMCtl::Defaults.new(
         config_dir: cfgdir, vm_root: '/bhyve', zpool: 'tank/bhyve',
         template: 'pod.conf', link_base: 10, run_dir: run, log_dir: '/l',
-        cpus: 1, memory: '1G'
+        cpus: 1, memory: '1G', rtc_localtime: true
       )
       vm = VMCtl::VM.new(entry, d)
       text = vm.render_config
@@ -164,7 +164,8 @@ class TestVM < Minitest::Test
       d = VMCtl::Defaults.new(
         config_dir: cfgdir, vm_root: '/bhyve', zpool: 'tank/bhyve',
         template: 'pod.conf', link_base: 10, run_dir: File.join(dir, 'run'),
-        log_dir: '/l', cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0'
+        log_dir: '/l', cpus: 1, memory: '1G', vnc_base: 5900, vnc_bind: '0.0.0.0',
+        rtc_localtime: true
       )
       vm = VMCtl::VM.new(entry, d)
       assert_equal '/fw/Y.fd', vm.resolved_config['bootrom']
