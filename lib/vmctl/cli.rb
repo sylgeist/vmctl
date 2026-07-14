@@ -9,6 +9,7 @@ require_relative 'netgraph'
 require_relative 'commands/base'
 require_relative 'commands/list'
 require_relative 'commands/status'
+require_relative 'commands/info'
 require_relative 'commands/start'
 require_relative 'commands/stop'
 require_relative 'commands/restart'
@@ -36,6 +37,7 @@ module VMCtl
         stop  [name|--all]    Graceful ACPI poweroff, then destroy on timeout.
         restart <name>        Graceful stop then start.
         status [name]         Running/stopped, pid, link, network.
+        info [name|--all]     Resource summary: cpus, memory, disks, networks.
         console <name>        Attach to the VM's nmdm console.
         dump <name>           Print the VM's fully-resolved bhyve config.
         create <name>         Allocate + provision a new VM (--network NET).
@@ -60,6 +62,7 @@ module VMCtl
     COMMANDS = {
       'list'    => Commands::List,
       'status'  => Commands::Status,
+      'info'    => Commands::Info,
       'start'   => Commands::Start,
       'stop'    => Commands::Stop,
       'restart' => Commands::Restart,
