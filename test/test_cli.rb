@@ -70,4 +70,9 @@ class TestCLI < Minitest::Test
     end
     assert_equal 2, code
   end
+
+  def test_info_verb_registered
+    assert_equal VMCtl::Commands::Info, VMCtl::CLI::COMMANDS['info']
+    assert_match(/^\s+info /, VMCtl::CLI::USAGE)
+  end
 end
