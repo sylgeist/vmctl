@@ -73,6 +73,7 @@ vmctl [options] <command> [args]
   console <name>       Attach to the VM's nmdm console (cu); ~. to detach.
   create <name>        Allocate + provision a new VM (--network NET).
   import <name>        Adopt an existing (zfs-recv'd) VM's disks (--network NET).
+  clone <src> <name>   Clone an existing VM into a new independent copy.
   destroy <name>       Remove a VM (--purge also zfs-destroys its dataset).
   list                 List configured VMs.
 
@@ -186,6 +187,29 @@ hook don't move:
 auto-allocation). Omit it to auto-allocate the lowest free link. After importing,
 stop the VM the old way once, then `vmctl start pod34` so vmctl's supervisor
 takes over.
+
+### Cloning
+
+`clone <source> <newname>` provisions a new VM as a full independent copy of an
+existing one — the homelab "golden template" workflow, though any VM can be a
+source:
+
+    vmctl clone pod34 web1                       # inherit pod34's bridge
+    vmctl clone pod34 web1 --network other_vlan  # place on a different bridge
+    vmctl clone pod34 web1 --cpus 2 --memory 4G --start
+
+The clone's disks are copied via `zfs snapshot` + `zfs send | zfs recv`, so the
+clone and source share no ZFS dependency — either can be `destroy`ed later
+independently. The source must be stopped (pass `--force` to clone a running VM
+with a crash-consistent snapshot).
+
+Inherited from the source: template (`config`), `cpus`, `memory`, `graphics`,
+`efi_vars`, `rtc_localtime`, `memory_wired`, `smbios`, `cloud_init`, and any
+additional `networks:`. Reset fresh: `name`, `link`, and MAC (the primary MAC
+is regenerated unless the source used bhyve auto-MAC, in which case the clone
+stays auto; `--mac` overrides). `autostart` defaults off. An installer `iso:` is
+not carried over, and UEFI vars are regenerated pristine on the clone's first
+start.
 
 `destroy <name>` removes a VM from the inventory (refusing if it is running);
 `--purge` also `zfs destroy`s the dataset. All three honor `-n/--dry-run`.
