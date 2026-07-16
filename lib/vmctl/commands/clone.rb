@@ -5,6 +5,7 @@ require_relative 'base'
 require_relative '../allocator'
 require_relative '../netgraph'
 require_relative '../provisioner'
+require_relative '../cloudinit'
 require_relative 'start'
 
 module VMCtl
@@ -25,6 +26,7 @@ module VMCtl
         validate!(source_vm, dest_vm, opts)
 
         provisioner.clone_dataset(source_vm, dest_vm)
+        rebuild_seed(dest_vm) if entry.cloud_init
         config.add_vm(entry)
         config.save(config.path) unless executor.dry_run?
         puts "cloned #{source_name} -> #{new_name} (link #{entry.link})"
@@ -61,7 +63,7 @@ module VMCtl
           mac: clone_mac(allocator, new_name, src.mac, opts),
           autostart: !!opts[:autostart],
           disks: rename_disks(src.name, new_name, src.disks),
-          cloud_init: src.cloud_init,
+          cloud_init: clone_cloud_init(src.cloud_init),
           iso: nil,
           options: src.options,
           mtu: src.mtu,
@@ -74,6 +76,15 @@ module VMCtl
           memory_wired: src.memory_wired,
           smbios: src.smbios
         )
+      end
+
+      # Deep-ish copy: the source's cloud_init hash (and its nested 'vars')
+      # must not be shared by reference with the clone's entry, or a later
+      # config.save sees the same Hash object twice in the YAML graph and
+      # emits an alias that YAML.safe_load(aliases: false) then rejects.
+      def clone_cloud_init(ci)
+        return nil unless ci
+        ci.each_with_object({}) { |(k, v), h| h[k] = v.is_a?(Hash) ? v.dup : v }
       end
 
       # nil source MAC -> nil (bhyve auto); otherwise a fresh deterministic MAC.
@@ -102,13 +113,26 @@ module VMCtl
         end
       end
 
+      # A cloned cloud-init VM must get its own seed ISO (fresh hostname /
+      # instance-id and %()-substitutions for the new identity); the source's
+      # copy arrived under the source name and is never referenced.
+      def rebuild_seed(dest_vm)
+        ci = dest_vm.entry.cloud_init
+        CloudInit.new(executor).build_seed(dest_vm, cloud_init_template(ci['user_data']), ci['vars'] || {})
+      end
+
       def validate!(source_vm, dest_vm, opts)
         raise CommandError, "dataset dir already exists: #{dest_vm.dir}" if File.exist?(dest_vm.dir)
-        if source_vm.running?(executor) && !opts[:force]
+        running = source_vm.running?(executor)
+        if running && !opts[:force]
           raise CommandError,
                 "#{source_vm.name} is running — stop it first (or pass --force for a crash-consistent clone)"
         end
-        warn "warning: #{source_vm.name} is running; clone is crash-consistent" if source_vm.running?(executor)
+        warn "warning: #{source_vm.name} is running; clone is crash-consistent" if running
+        if dest_vm.entry.cloud_init
+          tmpl = cloud_init_template(dest_vm.entry.cloud_init['user_data'])
+          raise CommandError, "cloud-init template not found: #{tmpl}" unless File.exist?(tmpl)
+        end
         ng = Netgraph.new(executor)
         dest_vm.nic_bridges.each { |b| ng.ensure_bridge!(b) }
       end

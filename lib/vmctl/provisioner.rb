@@ -53,6 +53,7 @@ module VMCtl
         @exec.pipe(['zfs', 'send', snap], ['zfs', 'recv', dest_ds])
         rename_clone_disks(source_vm, dest_vm)
         @exec.run('rm', '-f', File.join(dest_vm.dir, "#{source_vm.name}-uefi-vars.fd"))
+        @exec.run('rm', '-f', File.join(dest_vm.dir, "#{source_vm.name}-seed.iso"))
       rescue StandardError
         destroy_quietly(dest_ds)
         destroy_quietly(snap)

@@ -209,7 +209,8 @@ additional `networks:`. Reset fresh: `name`, `link`, and MAC (the primary MAC
 is regenerated unless the source used bhyve auto-MAC, in which case the clone
 stays auto; `--mac` overrides). `autostart` defaults off. An installer `iso:` is
 not carried over, and UEFI vars are regenerated pristine on the clone's first
-start.
+start. If the source uses `cloud_init:`, the seed ISO is regenerated for the
+clone's own identity (fresh hostname/instance-id), not copied.
 
 `destroy <name>` removes a VM from the inventory (refusing if it is running);
 `--purge` also `zfs destroy`s the dataset. All three honor `-n/--dry-run`.

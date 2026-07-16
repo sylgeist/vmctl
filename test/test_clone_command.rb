@@ -149,6 +149,27 @@ class TestCloneCommand < Minitest::Test
     assert_nil VMCtl::Config.load(@inv).vms.fetch('web1').mac
   end
 
+  def test_clone_rebuilds_cloud_init_seed_for_new_identity
+    File.write(File.join(@config_dir, 'web-base.yml'), "#cloud-config\nhostname: %(name)\n")
+    cfg = load_config
+    cfg.vms['pod34'].cloud_init = { 'user_data' => 'web-base.yml' }
+    exec = ready_exec
+    cmd = VMCtl::Commands::Clone.new(config: cfg, executor: exec)
+    capture_stdout { cmd.call(['pod34', 'web1']) }
+    assert(exec.runs.any? { |a| a.first == 'makefs' && a.any? { |x| x.to_s.include?('web1-seed.iso') } },
+           'clone must regenerate the seed ISO for the new identity')
+    assert_includes exec.runs, ['rm', '-f', File.join(@vm_root, 'web1', 'pod34-seed.iso')]
+    assert_equal 'web-base.yml', VMCtl::Config.load(@inv).vms.fetch('web1').cloud_init['user_data']
+  end
+
+  def test_clone_rejects_missing_cloud_init_template
+    cfg = load_config
+    cfg.vms['pod34'].cloud_init = { 'user_data' => 'nope.yml' }
+    cmd = VMCtl::Commands::Clone.new(config: cfg, executor: ready_exec)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', 'web1']) }
+    assert_match(/cloud-init template not found/, err.message)
+  end
+
   def test_clone_dry_run_writes_nothing
     exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false, 'ngctl info labs_vlan50:' => true },
                             dry_run: true)
