@@ -178,4 +178,15 @@ class TestCloneCommand < Minitest::Test
     capture_stdout { cmd.call(['pod34', 'web1']) }
     assert_equal before, File.read(@inv), 'dry-run must not change the inventory file'
   end
+
+  def test_clone_of_vm_with_smbios_and_options_reloads
+    cfg = load_config
+    cfg.vms['pod34'].smbios = { 'system.serial_number' => 'SRC123' }
+    cfg.vms['pod34'].options = { 'acpi_tables' => 'true' }
+    cmd = VMCtl::Commands::Clone.new(config: cfg, executor: ready_exec)
+    capture_stdout { cmd.call(['pod34', 'web1']) }
+    reloaded = VMCtl::Config.load(@inv)   # must not raise Psych::AliasesNotEnabled
+    assert_equal 'SRC123', reloaded.vms.fetch('web1').smbios['system.serial_number']
+    assert_equal({ 'acpi_tables' => 'true' }, reloaded.vms.fetch('web1').options)
+  end
 end

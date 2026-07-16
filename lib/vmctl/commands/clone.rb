@@ -65,7 +65,7 @@ module VMCtl
           disks: rename_disks(src.name, new_name, src.disks),
           cloud_init: clone_cloud_init(src.cloud_init),
           iso: nil,
-          options: src.options,
+          options: src.options&.dup,
           mtu: src.mtu,
           networks: clone_networks(allocator, new_name, src.networks),
           cpus: opts[:cpus] ? positive_int!(opts[:cpus], '--cpus') : src.cpus,
@@ -74,7 +74,7 @@ module VMCtl
           efi_vars: src.efi_vars,
           rtc_localtime: src.rtc_localtime,
           memory_wired: src.memory_wired,
-          smbios: src.smbios
+          smbios: src.smbios&.dup
         )
       end
 
