@@ -10,13 +10,14 @@ VMCtl.log_level = Logger::FATAL
 # data keyed by a substring of the joined command. Use in every test that
 # touches a shell-out boundary.
 class FakeExecutor
-  attr_reader :runs, :captures
+  attr_reader :runs, :captures, :pipes
 
   # captures: Hash of command-substring => stdout to return from #capture/#run
   # probes:   Hash of command-substring => boolean to return from #success?
   def initialize(captures: {}, probes: {}, dry_run: false)
     @runs = []
     @captures = []
+    @pipes = []
     @canned = captures
     @probes = probes
     @dry_run = dry_run
@@ -39,6 +40,11 @@ class FakeExecutor
   def success?(*argv)
     match = @probes.find { |k, _| argv.join(' ').include?(k) }
     match ? match[1] : true
+  end
+
+  def pipe(argv1, argv2)
+    @pipes << [argv1, argv2]
+    ""
   end
 
   private
