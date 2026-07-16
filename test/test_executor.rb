@@ -77,6 +77,10 @@ class TestExecutor < Minitest::Test
     assert_raises(VMCtl::ExecutorError) { VMCtl::Executor.new.pipe(['echo', 'hi'], ['false']) }
   end
 
+  def test_pipe_raises_when_first_stage_fails
+    assert_raises(VMCtl::ExecutorError) { VMCtl::Executor.new.pipe(['false'], ['cat']) }
+  end
+
   def test_pipe_is_noop_in_dry_run
     assert_equal "", VMCtl::Executor.new(dry_run: true).pipe(['echo', 'hi'], ['cat'])
   end
