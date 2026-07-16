@@ -110,4 +110,51 @@ class TestCloneCommand < Minitest::Test
     cmd = VMCtl::Commands::Clone.new(config: load_config, executor: ready_exec)
     assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34']) }
   end
+
+  def test_clone_refuses_running_source_without_force
+    exec = ready_exec('/dev/vmm/pod34' => true) # source appears running
+    cmd = VMCtl::Commands::Clone.new(config: load_config, executor: exec)
+    err = assert_raises(VMCtl::Commands::CommandError) { cmd.call(['pod34', 'web1']) }
+    assert_match(/running/, err.message)
+  end
+
+  def test_clone_allows_running_source_with_force
+    exec = ready_exec('/dev/vmm/pod34' => true)
+    cmd = VMCtl::Commands::Clone.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod34', 'web1', '--force']) }
+    assert VMCtl::Config.load(@inv).vms.key?('web1')
+  end
+
+  def test_clone_network_override
+    exec = ready_exec('ngctl info other_vlan:' => true)
+    cmd = VMCtl::Commands::Clone.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod34', 'web1', '--network', 'other_vlan']) }
+    assert_equal 'other_vlan', VMCtl::Config.load(@inv).vms.fetch('web1').network
+  end
+
+  def test_clone_mac_override
+    exec = ready_exec
+    cmd = VMCtl::Commands::Clone.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod34', 'web1', '--mac', '02:aa:bb:cc:dd:ee']) }
+    assert_equal '02:aa:bb:cc:dd:ee', VMCtl::Config.load(@inv).vms.fetch('web1').mac
+  end
+
+  def test_clone_preserves_nil_source_mac_as_auto
+    # Rewrite the source to have no MAC (bhyve auto); clone must stay auto.
+    inv = File.read(@inv).sub('mac: 5a:9c:fc:11:22:33', 'mac:')
+    File.write(@inv, inv)
+    exec = ready_exec
+    cmd = VMCtl::Commands::Clone.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod34', 'web1']) }
+    assert_nil VMCtl::Config.load(@inv).vms.fetch('web1').mac
+  end
+
+  def test_clone_dry_run_writes_nothing
+    exec = FakeExecutor.new(probes: { '/dev/vmm/pod34' => false, 'ngctl info labs_vlan50:' => true },
+                            dry_run: true)
+    before = File.read(@inv)
+    cmd = VMCtl::Commands::Clone.new(config: load_config, executor: exec)
+    capture_stdout { cmd.call(['pod34', 'web1']) }
+    assert_equal before, File.read(@inv), 'dry-run must not change the inventory file'
+  end
 end
