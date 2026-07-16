@@ -17,6 +17,7 @@ require_relative 'commands/console'
 require_relative 'commands/dump'
 require_relative 'commands/create'
 require_relative 'commands/import'
+require_relative 'commands/clone'
 require_relative 'commands/destroy'
 require_relative 'commands/add_disk'
 require_relative 'commands/grow_disk'
@@ -42,6 +43,7 @@ module VMCtl
         dump <name>           Print the VM's fully-resolved bhyve config.
         create <name>         Allocate + provision a new VM (--network NET).
         import <name>         Adopt an existing (zfs-recv'd) VM's disks.
+        clone <src> <name>    Clone an existing VM into a new independent copy.
         destroy <name>        Remove a VM (--purge also destroys its dataset).
         add-disk <name> <spec>  Add a disk (suffix:size[:from img]) to an existing VM.
         grow-disk <name> <sfx> <size>  Grow a disk and update the inventory.
@@ -70,6 +72,7 @@ module VMCtl
       'dump'    => Commands::Dump,
       'create'  => Commands::Create,
       'import'  => Commands::Import,
+      'clone'   => Commands::Clone,
       'destroy'  => Commands::Destroy,
       'add-disk'  => Commands::AddDisk,
       'grow-disk' => Commands::GrowDisk,
