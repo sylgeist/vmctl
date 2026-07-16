@@ -4,6 +4,7 @@ require 'test_helper'
 require 'vmctl/config'
 require 'vmctl/vm'
 require 'vmctl/provisioner'
+require 'vmctl/executor'
 require 'tmpdir'
 
 class TestProvisioner < Minitest::Test
@@ -107,5 +108,20 @@ class TestProvisioner < Minitest::Test
     dst = clone_vm('web1',  ['data.raw'])
     VMCtl::Provisioner.new(exec, clone_defaults).clone_dataset(src, dst)
     refute(exec.runs.any? { |a| a.first == 'mv' }, 'unchanged disk name must not be moved')
+  end
+
+  def test_clone_dataset_rolls_back_on_send_failure
+    boom = Class.new(FakeExecutor) do
+      def pipe(*)
+        raise VMCtl::ExecutorError, 'recv failed'
+      end
+    end.new
+    src = clone_vm('pod34', ['pod34-root.raw'])
+    dst = clone_vm('web1',  ['web1-root.raw'])
+    assert_raises(VMCtl::ExecutorError) do
+      VMCtl::Provisioner.new(boom, clone_defaults).clone_dataset(src, dst)
+    end
+    assert_includes boom.runs, ['zfs', 'destroy', 'tank/bhyve/web1']
+    assert_includes boom.runs, ['zfs', 'destroy', 'tank/bhyve/pod34@vmctl-clone-web1']
   end
 end

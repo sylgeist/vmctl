@@ -12,7 +12,7 @@ module VMCtl
     def initialize(executor, defaults)
       @exec = executor
       @defaults = defaults
-end
+    end
 
     def create_dataset(vm)
       @exec.run('zfs', 'create', "#{@defaults.zpool}/#{vm.name}")
