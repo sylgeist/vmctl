@@ -6,11 +6,13 @@ module VMCtl
   module Commands
     class List < Base
       def call(_args)
-        config.vms.each_value do |e|
-          mac = e.mac ? " mac #{e.mac}" : ''
-          auto = e.autostart ? ' [autostart]' : ''
-          puts "#{e.name}: #{e.network} link #{e.link}#{mac}#{auto}"
+        entries = config.vms.values
+        return if entries.empty?
+
+        rows = entries.map do |e|
+          [e.name, "#{e.network} link #{e.link}", e.mac || '', e.autostart ? 'yes' : '']
         end
+        Output.table(%w[NAME NETWORK MAC AUTOSTART], rows)
       end
     end
   end

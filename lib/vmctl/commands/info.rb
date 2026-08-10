@@ -8,6 +8,8 @@ module VMCtl
     # (cpus/memory/disks/networks). Complements `status` (liveness only) and
     # `dump` (the full rendered bhyve config).
     class Info < Base
+      STATE_COLORS = { running: :green, stopped: :gray, stale: :yellow }.freeze
+
       def call(args)
         all = args.delete('--all')
         vms = targets(args, all: all || args.empty?)
@@ -17,7 +19,7 @@ module VMCtl
       private
 
       def block_for(vm)
-        lines = ["#{vm.name}: #{state(vm)}"]
+        lines = ["#{vm.name}: #{colored_state(vm)}"]
         lines << row('cpus', cpus(vm))
         lines << row('memory', memory(vm))
         labeled('disks', disk_rows(vm), lines)
@@ -38,10 +40,15 @@ module VMCtl
         end
       end
 
-      def state(vm)
-        return 'stopped' unless vm.running?(executor)
-        return "running (pid #{vm.read_pid})" if vm.supervisor_alive?(executor)
-        'stale'
+      def colored_state(vm)
+        state, text = state_and_text(vm)
+        Output.colorize(text, STATE_COLORS.fetch(state))
+      end
+
+      def state_and_text(vm)
+        return [:stopped, 'stopped'] unless vm.running?(executor)
+        return [:running, "running (pid #{vm.read_pid})"] if vm.supervisor_alive?(executor)
+        [:stale, 'stale']
       end
 
       def cpus(vm)

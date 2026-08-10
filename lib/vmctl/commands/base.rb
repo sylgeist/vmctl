@@ -2,6 +2,7 @@
 # lib/vmctl/commands/base.rb
 require_relative '../vm'
 require_relative '../sizes'
+require_relative '../output'
 
 module VMCtl
   module Commands

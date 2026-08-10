@@ -5,7 +5,7 @@ require_relative 'base'
 module VMCtl
   module Commands
     class Status < Base
-      STATE_COLORS = { running: 32, stopped: 90, stale: 33 }.freeze
+      STATE_COLORS = { running: :green, stopped: :gray, stale: :yellow }.freeze
 
       def call(args)
         all = args.delete('--all')
@@ -13,7 +13,7 @@ module VMCtl
         rows = vms.map { |vm| row_for(vm) }
         return if rows.empty?
 
-        print_table(rows)
+        Output.table(%w[NAME STATE NETWORK], rows.map { |r| table_row(r) })
         print_stale_hints(rows)
       end
 
@@ -32,29 +32,15 @@ module VMCtl
         end
       end
 
-      # Columns are sized to the actual data so names/states of any length
-      # (single VM or the whole fleet) line up without wasted padding.
-      def print_table(rows)
-        name_w = ([4] + rows.map { |r| r[:name].length }).max
-        state_w = ([5] + rows.map { |r| r[:state_text].length }).max
-
-        puts format('%-*s  %-*s  %s', name_w, 'NAME', state_w, 'STATE', 'NETWORK')
-        rows.each do |r|
-          state = colorize(r[:state_text].ljust(state_w), STATE_COLORS.fetch(r[:state]))
-          puts "#{r[:name].ljust(name_w)}  #{state}  #{r[:network]}"
-        end
+      def table_row(r)
+        [r[:name], Output.colorize(r[:state_text], STATE_COLORS.fetch(r[:state])), r[:network]]
       end
 
       def print_stale_hints(rows)
         rows.select { |r| r[:state] == :stale }.each do |r|
           hint = "  ! #{r[:name]}: no live supervisor; run 'vmctl stop --force #{r[:name]}'"
-          puts colorize(hint, STATE_COLORS.fetch(:stale))
+          puts Output.colorize(hint, :yellow)
         end
-      end
-
-      def colorize(text, code)
-        return text unless $stdout.tty?
-        "\e[#{code}m#{text}\e[0m"
       end
     end
   end
