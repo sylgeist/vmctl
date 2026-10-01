@@ -99,7 +99,7 @@ module VMCtl
         exit 2
       end
 
-      VMCtl.log_level = options[:verbose] ? Logger::DEBUG : Logger::INFO
+      VMCtl.log_level = options[:verbose] ? Log::DEBUG : Log::INFO
 
       cmd = argv.shift
       if cmd.nil?

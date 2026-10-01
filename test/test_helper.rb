@@ -4,7 +4,7 @@ require 'minitest/autorun'
 require 'vmctl/log'
 
 # Keep test output pristine; tests assert on behavior, not log lines.
-VMCtl.log_level = Logger::FATAL
+VMCtl.log_level = VMCtl::Log::FATAL
 
 # Records mutating commands as argv arrays; answers queries/probes from canned
 # data keyed by a substring of the joined command. Use in every test that
