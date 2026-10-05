@@ -14,6 +14,13 @@ start_cmd="vmctl_start"
 stop_cmd="vmctl_stop"
 : ${vmctl_bin:="/usr/local/bin/vmctl"}
 
+# rc runs with PATH=/sbin:/bin:/usr/sbin:/usr/bin, but bin/vmctl is
+# `#!/usr/bin/env ruby` and ruby (plus any port tools vmctl calls) is in
+# /usr/local. Without this, boot fails with "env: ruby: No such file or
+# directory" on the console only, and autostart VMs stay down (mir 2026-10-05).
+PATH="${PATH}:/usr/local/sbin:/usr/local/bin"
+export PATH
+
 vmctl_start()
 {
     ${vmctl_bin} start --all
